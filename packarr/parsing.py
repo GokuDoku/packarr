@@ -57,8 +57,11 @@ def clean_title(name: str) -> str:
     return re.sub(r"\s+", " ", t).strip(" -")
 
 
+_ROMAN = {"i": "1", "ii": "2", "iii": "3", "iv": "4"}  # "Reflection Part I" must match "Part 1"; 'v' is left alone (v2 tags)
+
+
 def tokens(t: str) -> set[str]:
-    return {(w.lstrip("0") or "0") if w.isdigit() else w for w in re.findall(r"[a-z0-9]+", t.lower()) if w not in _STOP}
+    return {(w.lstrip("0") or "0") if w.isdigit() else _ROMAN.get(w, w) for w in re.findall(r"[a-z0-9]+", t.lower()) if w not in _STOP}
 
 
 def pack_quality(title: str) -> dict | None:

@@ -249,12 +249,7 @@ class Pipeline:
             if r["seriesId"] == job["seriesId"] and not job.get("all") and r["epId"] not in need:
                 skipped += 1
                 continue
-            if q is None:
-                if "probed_q" not in job:
-                    job["probed_q"] = P.quality_from_height(probe.height(self.to_local(r["path"])))
-                qq = job["probed_q"]
-            else:
-                qq = q
+            qq = q or P.quality_from_height(probe.height(self.to_local(r["path"])))  # no source tag: probe each file (a pack can mix 480p TV + 1080p OVA)
             files.append({"path": r["path"], "seriesId": r["seriesId"], "episodeIds": [r["epId"]], "quality": qq,
                           "languages": self.languages(job), "releaseGroup": "", "indexerFlags": 0})
         log(f"[{job['series']}] plan OK: {len(plan)} videos, {len(mapped)} mapped, import {len(files)}, already good {skipped}, extras/unmapped {len(plan) - len(mapped)}")
@@ -289,11 +284,11 @@ class Pipeline:
             log(f"[{job['series']}] explicit map - torrent kept with {len(left)} leftover files for review")
             return
         specials = self.sonarr.episodes(job["seriesId"], season=0)
-        q = P.pack_quality(job["title"]) or job.get("probed_q") or P.quality_from_height(1080)
         unresolved = []
         for f in sorted(left):
             rel = os.path.relpath(f, root)
             mins = probe.duration_min(f)
+            q = P.pack_quality(job["title"]) or P.quality_from_height(probe.height(f))
             if P.EXTRA_DIR.search(os.path.dirname(rel)) or re.search(r"interview|commentary|trailer|\bPV\b|\bCM\b|music video|NC(OP|ED)", rel, re.I):
                 continue
             if mins < 40 and not re.search(r"movie|film|gekijou|special|ova|oad", rel, re.I):

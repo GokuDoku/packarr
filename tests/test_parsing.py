@@ -68,3 +68,7 @@ def test_search_score_prefers_real_dual_over_optional_dual():
     trap = {"title": "[Trix] Escaflowne [Optional Dual Audio] [AV1] 01-26", "size": 6e9, "seeders": 80}
     assert score(good, cfg)[0] > score(trap, cfg)[0]
     assert "avoid-tag" in score(trap, cfg)[1]
+
+
+def test_roman_numerals_match_arabic_in_titles():
+    assert P.tokens("Rurouni.Kenshin.Reflection.Part.I.2001") & P.tokens("Reflection: After So Many Years Have Lapsed, Part 1") >= {"reflection", "part", "1"}
