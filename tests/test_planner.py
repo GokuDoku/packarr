@@ -170,3 +170,17 @@ def test_foreign_folder_goes_to_the_other_sonarr_series(make_planner):
     by = {r["rel"]: r for r in plan}
     assert by[files[0]]["seriesId"] == 7 and by[files[0]]["se"] == (1, 3)
     assert by[files[1]]["seriesId"] == 1 and by[files[1]]["se"] == (1, 3)
+
+
+def test_stale_table_with_numbered_default_season_stays_in_that_season(make_planner):
+    """Hetalia: anime-lists still says episodes 27-52 are TVDB S2, but TVDB merged them into a 52-episode S1."""
+    maps = [{"anidbseason": 1, "tvdbseason": 1, "start": 1, "end": 26, "offset": 0, "pairs": {}},
+            {"anidbseason": 1, "tvdbseason": 2, "start": 27, "end": 52, "offset": -26, "pairs": {}}]
+    res = FakeResolver({"Hetalia Axis Powers": entry(88161, 1, 0, 52, "Hetalia Axis Powers", maps)})
+    pl = make_planner(res)
+    eps = episodes({1: 52, 2: 48})
+    files = ["Hetalia Axis Powers/Hetalia_Axis_Powers_Ep27_(CC6866E3).mkv", "Hetalia Axis Powers/Hetalia_Axis_Powers_Ep05_(AAAA0000).mkv"]
+    plan, issues = pl.plan(job("Hetalia - Axis Powers", 88161), items(files), eps, {})
+    assert not issues
+    m = mapping(plan)
+    assert m[files[0]] == (1, 27) and m[files[1]] == (1, 5)
