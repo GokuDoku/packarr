@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "packarr"
+version = "0.1.0"
+description = "Season & series packs for anime, mapped right and imported through Sonarr."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+authors = [{ name = "GokuDoku" }]
+keywords = ["sonarr", "radarr", "prowlarr", "anime", "nyaa", "transmission", "anime-lists", "anilist", "tvdb"]
+classifiers = [
+  "Environment :: Console",
+  "Intended Audience :: End Users/Desktop",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Multimedia :: Video",
+]
+dependencies = ["PyYAML>=6.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "ruff>=0.4"]
+
+[project.scripts]
+packarr = "packarr.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/GokuDoku/packarr"
+Issues = "https://github.com/GokuDoku/packarr/issues"
+
+[tool.setuptools.packages.find]
+include = ["packarr*"]
+
+[tool.ruff]
+line-length = 140
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501", "B008", "B904"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

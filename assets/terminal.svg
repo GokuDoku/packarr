@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="470" viewBox="0 0 980 470" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" role="img" aria-label="packarr search, add and run output">
+  <rect width="980" height="470" rx="14" fill="#0b1020"/>
+  <rect width="980" height="34" rx="14" fill="#151a2e"/>
+  <rect y="20" width="980" height="14" fill="#151a2e"/>
+  <circle cx="22" cy="17" r="6" fill="#ff5f57"/><circle cx="42" cy="17" r="6" fill="#febc2e"/><circle cx="62" cy="17" r="6" fill="#28c840"/>
+  <text x="490" y="22" text-anchor="middle" fill="#8b93a7" font-size="12">packarr — a complete series in one shot</text>
+  <g fill="#c9d1d9">
+    <text x="20" y="64"><tspan fill="#7ee787">$</tspan> packarr search "Mobile Suit Gundam Wing" --episodes 49</text>
+    <text x="20" y="86"><tspan fill="#8b93a7">  #  score seeds    size  title</tspan></text>
+    <text x="20" y="108">  0   <tspan fill="#7ee787">51</tspan>   132s   11.3 GB  [AnimeRG] Mobile Suit Gundam Wing (Complete Series) 01-49 [1080p] [DUAL-AUDIO] [BD] [HEVC]   <tspan fill="#8b93a7">[dual, group:AnimeRG, complete, 230MB/ep]</tspan></text>
+    <text x="20" y="130">  1   <tspan fill="#f2cc60">28</tspan>    14s   35.6 GB  [OZC] Mobile Suit Gundam Wing Remastered Complete Series+OVA/Movie (Dual Audio)              <tspan fill="#8b93a7">[dual, 727MB/ep]</tspan></text>
+    <text x="20" y="152">  2   <tspan fill="#ff7b72">-33</tspan>     3s    9.1 GB  [Trix] Gundam Wing [Optional Dual Audio] [AV1]                                                <tspan fill="#8b93a7">[avoid-tag, unseeded]</tspan></text>
+    <text x="20" y="174"><tspan fill="#8b93a7">-- 3 candidates; `packarr add &lt;row&gt; --series &lt;id&gt;`</tspan></text>
+
+    <text x="20" y="212"><tspan fill="#7ee787">$</tspan> packarr add 0 --series 86</text>
+    <text x="20" y="234"><tspan fill="#8b93a7">11:24:43</tspan> queued [Mobile Suit Gundam Wing] 11.3 GB  [AnimeRG] Mobile Suit Gundam Wing (Complete Series) 01-49 [1080p]</text>
+
+    <text x="20" y="272"><tspan fill="#7ee787">$</tspan> packarr run --interval 300</text>
+    <text x="20" y="294"><tspan fill="#8b93a7">11:25:01</tspan> started #29 [AnimeRG] Mobile Suit Gundam Wing (Complete Series) 01-49 [1080p] [DUAL-AUDIO]</text>
+    <text x="20" y="316"><tspan fill="#8b93a7">11:30:02</tspan> #29 100.0% 2.4 MB/s eta 0s  [AnimeRG] Mobile Suit Gundam Wing</text>
+    <text x="20" y="338"><tspan fill="#8b93a7">11:35:16</tspan> #29 tracks: Gundam Wing - 01: hevc 1072p audio=['eng:English Stereo', 'jpn:Japanese Stereo']; …</text>
+    <text x="20" y="360"><tspan fill="#8b93a7">11:35:33</tspan> [Mobile Suit Gundam Wing] <tspan fill="#7ee787">plan OK</tspan>: 49 videos, 49 mapped, import 49, already good 0, extras/unmapped 0</text>
+    <text x="20" y="382"><tspan fill="#8b93a7">11:50:04</tspan> [Mobile Suit Gundam Wing] ManualImport completed</text>
+    <text x="20" y="404"><tspan fill="#8b93a7">11:50:04</tspan> [Mobile Suit Gundam Wing] 14 video files remain after episode import  <tspan fill="#8b93a7">(Extras/, Music/ — binned)</tspan></text>
+    <text x="20" y="426"><tspan fill="#8b93a7">12:00:05</tspan> #29 removed; <tspan fill="#7ee787">49 episodes imported</tspan></text>
+    <text x="20" y="452"><tspan fill="#f2cc60">12:10:10</tspan> [Monster] plan has 1 issue(s) - <tspan fill="#f2cc60">HELD</tspan> (plans/31-Monster.json): 1 unmapped: Monster Extra 1 - Origin.mkv</text>
+  </g>
+</svg>

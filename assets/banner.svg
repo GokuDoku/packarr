@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="320" viewBox="0 0 1200 320" role="img" aria-label="Packarr - season and series packs for anime, mapped right, imported through Sonarr">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f0e2a"/>
+      <stop offset="1" stop-color="#2a2670"/>
+    </linearGradient>
+    <linearGradient id="tape" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#f472b6"/>
+      <stop offset="1" stop-color="#fb923c"/>
+    </linearGradient>
+    <linearGradient id="flow" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#818cf8"/>
+      <stop offset="1" stop-color="#34d399"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="320" rx="28" fill="url(#bg)"/>
+  <!-- subtle grid -->
+  <g stroke="#ffffff" stroke-opacity="0.04">
+    <path d="M0 80H1200M0 160H1200M0 240H1200"/>
+    <path d="M300 0V320M600 0V320M900 0V320"/>
+  </g>
+  <!-- logo mark -->
+  <g transform="translate(64,56) scale(0.82)">
+    <path d="M60 92 L128 60 L196 92 L196 176 L128 208 L60 176 Z" fill="none" stroke="#c7d2fe" stroke-width="10" stroke-linejoin="round"/>
+    <path d="M60 92 L128 124 L196 92 M128 124 L128 208" fill="none" stroke="#c7d2fe" stroke-width="10" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="M94 76 L162 108" stroke="url(#tape)" stroke-width="14" stroke-linecap="round"/>
+    <circle cx="190" cy="186" r="34" fill="#22c55e" stroke="#0f0e2a" stroke-width="8"/>
+    <path d="M174 187 L185 198 L207 174" fill="none" stroke="#052e16" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <!-- wordmark -->
+  <text x="300" y="150" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="88" font-weight="800" fill="#f5f3ff" letter-spacing="-2">Pack<tspan fill="url(#tape)">arr</tspan></text>
+  <text x="304" y="200" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="26" font-weight="500" fill="#c7d2fe">Season &amp; series packs for anime — mapped right, imported through Sonarr.</text>
+  <!-- the flow -->
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="18" font-weight="600">
+    <g transform="translate(304,236)">
+      <rect width="112" height="40" rx="10" fill="#1e1b4b" stroke="#6366f1" stroke-width="2"/>
+      <text x="56" y="26" text-anchor="middle" fill="#e0e7ff">Nyaa</text>
+    </g>
+    <path d="M420 256 H452" stroke="url(#flow)" stroke-width="3"/>
+    <g transform="translate(456,236)">
+      <rect width="164" height="40" rx="10" fill="#1e1b4b" stroke="#6366f1" stroke-width="2"/>
+      <text x="82" y="26" text-anchor="middle" fill="#e0e7ff">Transmission</text>
+    </g>
+    <path d="M624 256 H656" stroke="url(#flow)" stroke-width="3"/>
+    <g transform="translate(660,236)">
+      <rect width="236" height="40" rx="10" fill="#14532d" stroke="#22c55e" stroke-width="2"/>
+      <text x="118" y="26" text-anchor="middle" fill="#dcfce7">plan · verify · route</text>
+    </g>
+    <path d="M900 256 H932" stroke="url(#flow)" stroke-width="3"/>
+    <g transform="translate(936,236)">
+      <rect width="120" height="40" rx="10" fill="#1e1b4b" stroke="#6366f1" stroke-width="2"/>
+      <text x="60" y="26" text-anchor="middle" fill="#e0e7ff">Sonarr</text>
+    </g>
+  </g>
+</svg>

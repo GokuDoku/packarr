@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Packarr logo">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1e1b4b"/>
+      <stop offset="1" stop-color="#312e81"/>
+    </linearGradient>
+    <linearGradient id="tape" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#f472b6"/>
+      <stop offset="1" stop-color="#fb923c"/>
+    </linearGradient>
+  </defs>
+  <!-- rounded tile -->
+  <rect x="8" y="8" width="240" height="240" rx="52" fill="url(#bg)"/>
+  <!-- the pack: three stacked episodes -->
+  <g fill="#e0e7ff" opacity="0.18">
+    <rect x="56" y="70" width="144" height="26" rx="8"/>
+    <rect x="56" y="106" width="144" height="26" rx="8"/>
+    <rect x="56" y="142" width="144" height="26" rx="8"/>
+  </g>
+  <!-- the box -->
+  <path d="M60 92 L128 60 L196 92 L196 176 L128 208 L60 176 Z" fill="none" stroke="#c7d2fe" stroke-width="10" stroke-linejoin="round"/>
+  <path d="M60 92 L128 124 L196 92 M128 124 L128 208" fill="none" stroke="#c7d2fe" stroke-width="10" stroke-linejoin="round" stroke-linecap="round"/>
+  <!-- packing tape = the mapping line -->
+  <path d="M94 76 L162 108" stroke="url(#tape)" stroke-width="14" stroke-linecap="round"/>
+  <!-- verified -->
+  <circle cx="190" cy="186" r="34" fill="#22c55e" stroke="#1e1b4b" stroke-width="8"/>
+  <path d="M174 187 L185 198 L207 174" fill="none" stroke="#052e16" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

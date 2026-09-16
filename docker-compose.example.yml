@@ -1,0 +1,30 @@
+# Drop this next to your existing *arr stack. Two containers share one config volume:
+#   packarr        - the pipeline (start queued packs, plan, import, clean up) on a 5-minute tick
+#   packarr-hook   - optional: listens for Sonarr "On Series Add" webhooks (auto mode)
+services:
+  packarr:
+    image: ghcr.io/gokudoku/packarr:latest
+    container_name: packarr
+    restart: unless-stopped
+    environment:
+      - SONARR_API_KEY=${SONARR_API_KEY}
+      - RADARR_API_KEY=${RADARR_API_KEY}
+      - PROWLARR_API_KEY=${PROWLARR_API_KEY}
+      - JELLYFIN_API_KEY=${JELLYFIN_API_KEY}
+    volumes:
+      - ./packarr:/config                      # packarr.yml, jobs.json, plans/, mapping tables
+      - /path/to/torrents/complete:/downloads  # the SAME folder Transmission and Sonarr see (set paths.* in packarr.yml)
+
+  packarr-hook:
+    image: ghcr.io/gokudoku/packarr:latest
+    container_name: packarr-hook
+    restart: unless-stopped
+    command: ["packarr", "serve"]
+    environment:
+      - SONARR_API_KEY=${SONARR_API_KEY}
+      - PROWLARR_API_KEY=${PROWLARR_API_KEY}
+    volumes:
+      - ./packarr:/config
+      - /path/to/torrents/complete:/downloads
+    ports:
+      - "7979:7979"
