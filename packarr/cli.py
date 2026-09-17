@@ -149,8 +149,8 @@ def cmd_subs(args):
     cfg, pipe = _pipe(args)
     if not cfg.languages.subtitles:
         raise SystemExit("set languages.subtitles (e.g. [eng, jpn]) first")
-    if not pipe.jellyfin:
-        raise SystemExit("subtitle checks need jellyfin configured (Sonarr knows nothing about subtitle tracks)")
+    if not pipe.jellyfin and not cfg.paths.library_maps and not os.path.isdir(next(iter([s["path"] for s in pipe.sonarr.series()[:1]]), "/nonexistent")):
+        raise SystemExit("subtitle checks need the library reachable (mount it; paths.library_maps) or jellyfin configured")
     series = [pipe.sonarr.series_one(args.series)] if args.series else [s for s in pipe.sonarr.series() if s.get("seriesType") == "anime"]
     total = 0
     for s in series:
@@ -163,7 +163,7 @@ def cmd_subs(args):
         if args.fetch:
             if not pipe.bazarr:
                 raise SystemExit("bazarr is not configured")
-            total += pipe.fill_subtitles(s["id"], s["tvdbId"])
+            total += pipe.fill_subtitles(s["id"], s["tvdbId"], args.limit)
     print(f"-- {'requested ' + str(total) + ' from Bazarr' if args.fetch else 'dry run complete'}")
 
 
@@ -238,6 +238,7 @@ def main(argv=None):
     p = sub.add_parser("subs", help="episodes whose files lack a wanted subtitle language; --fetch asks Bazarr for them")
     p.add_argument("--series", type=int, help="one Sonarr series id (default: every anime series)")
     p.add_argument("--fetch", action="store_true", help="actually request the subtitles from Bazarr")
+    p.add_argument("--limit", type=int, default=0, help="at most this many requests per series (0 = all)")
     p.set_defaults(fn=cmd_subs)
 
     p = sub.add_parser("serve", help="listen for Sonarr 'On Series Add' webhooks (auto mode)")

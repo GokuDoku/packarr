@@ -26,10 +26,11 @@ from .clients.radarr import Radarr
 from .clients.sonarr import Sonarr, languages
 from .clients.transmission import DOWNLOAD, DOWNLOAD_WAIT, Transmission
 from .config import Config
-from .gaps import needed
+from .gaps import good_episodes, needed
 from .log import log
 from .mapping import Resolver
 from .planner import Planner
+from .probe import ProbeCache
 from .router import Router
 
 TERMINAL = ("rejected", "lost", "import-failed", "superseded", "done", "cancelled")
@@ -46,6 +47,7 @@ class Pipeline:
         self.resolver = Resolver(cfg.paths.state_dir, cfg.anidb_cache_dir)
         self.planner = Planner(self.resolver, lambda sid: self.sonarr.episodes(sid), probe.duration_min, self.to_local)
         self.router = Router(self.sonarr, self.radarr, cfg.radarr.anime_root, cfg.radarr.quality_profile)
+        self.probe_cache = ProbeCache(os.path.join(cfg.paths.state_dir, "probe-cache.json"))
         self.state_path = os.path.join(cfg.paths.state_dir, "jobs.json")
         self.plans_dir = os.path.join(cfg.paths.state_dir, "plans")
         os.makedirs(self.plans_dir, exist_ok=True)
@@ -56,6 +58,13 @@ class Pipeline:
 
     def to_sonarr(self, local_path: str) -> str:
         return os.path.join(self.cfg.paths.downloads_sonarr, os.path.relpath(local_path, self.cfg.paths.downloads_local))
+
+    def library_local(self, sonarr_path: str) -> str:
+        """A library file as Sonarr names it -> as Packarr can open it (paths.library_maps; identical when unset)."""
+        for prefix, local in sorted(self.cfg.paths.library_maps.items(), key=lambda kv: -len(kv[0])):
+            if sonarr_path.startswith(prefix.rstrip("/") + "/") or sonarr_path == prefix.rstrip("/"):
+                return local.rstrip("/") + sonarr_path[len(prefix.rstrip("/")):]
+        return sonarr_path
 
     def free_gb(self) -> float:
         return shutil.disk_usage(self.cfg.paths.downloads_local).free / 1e9
@@ -244,7 +253,8 @@ class Pipeline:
                 pass
             return 0
         eps = self.sonarr.episodes(job["seriesId"])
-        need = needed(self.sonarr, self.jellyfin, job["seriesId"], job["tvdb"], eps, self.cfg.languages.wanted, self.cfg.languages.subtitles)
+        need = needed(self.sonarr, self.jellyfin, job["seriesId"], job["tvdb"], eps, self.cfg.languages.wanted, self.cfg.languages.subtitles,
+                      self.library_local, self.probe_cache)
         files, skipped = [], 0
         q = P.pack_quality(job["title"])
         for r in mapped:
@@ -314,25 +324,35 @@ class Pipeline:
 
     # ---- subtitles without re-downloading -------------------------------------------------------------
     def missing_subtitles(self, series_id: int, tvdb_id: int) -> list[tuple[dict, str]]:
-        """[(episode, lang)] for every episode whose file lacks a wanted subtitle language (Jellyfin's stream data)."""
+        """[(episode, lang)] for every episode whose file lacks a wanted subtitle language - from the files themselves
+        (ffprobe, cached) when the library is reachable, else Jellyfin's stream data."""
         wanted = self.cfg.languages.subtitles
-        if not wanted or not self.jellyfin:
+        if not wanted:
             return []
         eps = [e for e in self.sonarr.episodes(series_id) if e.get("hasFile")]
         out = []
         for lang in wanted:
-            have = self.jellyfin.episodes_with_audio(tvdb_id, "und", [lang])  # "und" = any audio: only the subtitle track matters here
+            have = good_episodes(self.sonarr, self.jellyfin, series_id, tvdb_id, eps, "und", [lang], self.library_local, self.probe_cache)
             if have is None:
                 return []
             out += [(e, lang) for e in eps if (e["seasonNumber"], e["episodeNumber"]) not in have]
         return out
 
-    def fill_subtitles(self, series_id: int, tvdb_id: int) -> int:
-        """Ask Bazarr to fetch each missing (episode, language). Returns how many requests were made."""
+    def ensure_bazarr_profile(self, series_id: int) -> bool:
+        """Put an anime series on the configured Bazarr language profile (so Bazarr wants the same languages Packarr does)."""
+        pid = self.cfg.bazarr.anime_profile_id
+        if not self.bazarr or not pid:
+            return False
+        return self.bazarr.set_profile(series_id, pid)
+
+    def fill_subtitles(self, series_id: int, tvdb_id: int, limit: int = 0) -> int:
+        """Ask Bazarr to fetch each missing (episode, language). Returns how many succeeded. limit=0 means all."""
         if not self.bazarr:
             return 0
         n = 0
-        for e, lang in self.missing_subtitles(series_id, tvdb_id):
+        self.ensure_bazarr_profile(series_id)
+        missing = self.missing_subtitles(series_id, tvdb_id)
+        for e, lang in (missing[:limit] if limit else missing):
             ok, why = self.bazarr.download(series_id, e["id"], lang)
             log(f"  bazarr S{e['seasonNumber']:02d}E{e['episodeNumber']:02d} {lang}: {why}")
             n += ok

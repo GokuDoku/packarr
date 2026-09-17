@@ -31,10 +31,31 @@ class Bazarr:
                 return x.status, (json.loads(raw) if raw else None)
         except urllib.error.HTTPError as e:
             return e.code, e.read().decode(errors="replace")[:300]
+        except (urllib.error.URLError, OSError) as e:  # Bazarr down / restarting: report, never crash the caller
+            return 0, f"bazarr unreachable: {e}"
 
     def ok(self) -> bool:
         code, _ = self._call("/system/status")
         return code == 200
+
+    def series_profile(self, series_id: int) -> int | None:
+        code, body = self._call("/series", params={"seriesid[]": series_id})
+        if code == 200 and isinstance(body, dict) and body.get("data"):
+            return body["data"][0].get("profileId")
+        return None
+
+    def set_profile(self, series_id: int, profile_id: int) -> bool:
+        """Assign a Bazarr language profile to a series (Bazarr ids == Sonarr ids)."""
+        if self.series_profile(series_id) == profile_id:
+            return True
+        url = self.base + "/series"
+        data = urllib.parse.urlencode([("seriesid", series_id), ("profileid", profile_id)]).encode()
+        req = urllib.request.Request(url, data=data, headers={"X-API-KEY": self.key, "Content-Type": "application/x-www-form-urlencoded"}, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as x:
+                return x.status in (200, 204)
+        except (urllib.error.URLError, OSError):
+            return False
 
     def download(self, series_id: int, episode_id: int, lang: str, forced: bool = False, hi: bool = False) -> tuple[bool, str]:
         """Search providers and download the best subtitle in `lang` (ISO 639-2 or 639-1) for one episode."""

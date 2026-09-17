@@ -184,14 +184,24 @@ imports from Judas/EMBER/Anime Time can never be upgrades. Packarr stamps the la
 Audio was the original job; subtitles came from the first feature request. Two halves:
 
 1. **Targeting.** `languages.subtitles: [eng, jpn]` makes an episode count as "already good" only when its file carries
-   those subtitle tracks as well as the wanted audio (Jellyfin's stream data — Sonarr knows nothing about subtitles).
-   Search ranks releases that advertise `Multi-Subs`/`Eng Sub` higher, the post-download probe reports each file's
-   subtitle languages, and `languages.subtitles_required: true` holds a pack whose files lack one instead of importing it.
+   those subtitle tracks as well as the wanted audio. **The file is the truth:** mount your library into Packarr
+   (`paths.library_maps` if Sonarr sees it at a different path) and it ffprobes each file itself — embedded tracks *and*
+   sidecar files (`.eng.srt`, `.ja.ass`, `.en.hi.srt`) — with results cached by path/size/mtime, so a sweep only probes
+   what changed. Jellyfin's stream data is the fallback when the library isn't reachable; Sonarr's tags are the last resort
+   (audio only — Sonarr knows nothing about subtitles). Search ranks releases advertising `Multi-Subs`/`Eng Sub` higher,
+   the post-download probe reports each file's subtitle languages, and `languages.subtitles_required: true` holds a pack
+   whose files lack one instead of importing it.
 2. **Filling, without re-downloading.** With `bazarr:` configured, `packarr subs --fetch` walks your anime (or one
    `--series`), finds every file missing a wanted subtitle language, and asks Bazarr to fetch exactly those
-   episode/language pairs. It also runs automatically after each pack import (`bazarr.fill_after_import`). Bazarr does the
-   provider work (OpenSubtitles etc.) and writes the sidecar files; Packarr just tells it what's missing. Make sure the
-   languages are enabled in Bazarr's language profile for those series.
+   episode/language pairs (`--limit N` to pace it). It also runs automatically after each pack import
+   (`bazarr.fill_after_import`). Bazarr does the provider work and writes the sidecar files; Packarr just tells it what's
+   missing and — with `bazarr.anime_profile_id` set — puts anime series on your "English + Japanese" Bazarr profile so
+   Bazarr wants the same languages you do.
+
+   Bazarr notes from setting it up: its first sync of a large library takes **hours** (it inspects every file for embedded
+   subtitles) and its API resets connections while it does; Japanese anime subtitles come from **jimaku.cc** (free API key)
+   or AnimeTosho — the login-free providers (Gestdown, Podnapisi, YIFY) are English-centric; a global English default
+   profile makes Bazarr hunt subtitles for your *whole* library, which may or may not be what you want.
 
 ## 🤖 Auto mode
 

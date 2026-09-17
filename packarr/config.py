@@ -49,6 +49,7 @@ class Prowlarr(Service):
 @dataclass
 class Bazarr(Service):
     fill_after_import: bool = True  # after a pack imports, ask Bazarr for any wanted subtitle language the files lack
+    anime_profile_id: int = 0  # Bazarr language profile to enforce on Sonarr anime series (0 = leave Bazarr's assignment alone)
 
 
 @dataclass
@@ -66,6 +67,7 @@ class Paths:
     downloads_sonarr: str = "/downloads"  # the same folder as Sonarr/Radarr see it
     state_dir: str = "/config"  # jobs, plans, resolver cache, mapping data
     log_file: str = ""  # optional; stdout is always written
+    library_maps: dict[str, str] = field(default_factory=dict)  # Sonarr library path prefix -> the same folder as Packarr sees it (empty = identical)
 
 
 @dataclass
@@ -180,6 +182,7 @@ bazarr:                       # optional - fetch missing subtitle languages for 
   url: http://bazarr:6767
   api_key: ${BAZARR_API_KEY}
   fill_after_import: true
+  anime_profile_id: 0         # a Bazarr language profile (e.g. English + Japanese) to enforce on Sonarr's anime series
 
 transmission:
   url: http://transmission:9091/transmission/rpc
@@ -192,6 +195,8 @@ paths:
   downloads_sonarr: /downloads  # ...as Sonarr/Radarr see it
   state_dir: /config
   log_file: /config/packarr.log
+  library_maps: {}              # Sonarr library root -> where Packarr sees it, e.g. {"/tv": "/media/tv"}; empty = same paths.
+                                # Mount your library read-only into Packarr and it will ffprobe files itself (audio + subtitle tracks).
 
 limits:
   max_active: 6

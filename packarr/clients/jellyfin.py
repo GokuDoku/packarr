@@ -26,10 +26,15 @@ class Jellyfin:
         with urllib.request.urlopen(req, timeout=self.timeout) as x:
             return json.loads(x.read())
 
+    _series_index: dict[str, str] | None = None
+
     def series_by_tvdb(self, tvdb_id: int) -> str | None:
-        r = self._get("/Items", IncludeItemTypes="Series", Recursive="true", AnyProviderIdEquals=f"Tvdb.{tvdb_id}", Fields="ProviderIds")
-        items = r.get("Items") or []
-        return items[0]["Id"] if items else None
+        """Jellyfin 12 returns EVERY series for AnyProviderIdEquals, so never trust the filter: index all series by their
+        own ProviderIds once and look the id up client-side."""
+        if self._series_index is None:
+            r = self._get("/Items", IncludeItemTypes="Series", Recursive="true", Fields="ProviderIds", Limit=20000)
+            self._series_index = {str((it.get("ProviderIds") or {}).get("Tvdb")): it["Id"] for it in r.get("Items") or [] if (it.get("ProviderIds") or {}).get("Tvdb")}
+        return self._series_index.get(str(tvdb_id))
 
     def episodes_with_audio(self, tvdb_id: int, lang: str, subtitles: list[str] | None = None) -> set[tuple[int, int]] | None:
         """{(season, episode)} whose file carries `lang` audio AND every language in `subtitles` as a subtitle track,

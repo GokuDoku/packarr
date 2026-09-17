@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.1 — 2026-09-16
+
+Tested against a live Bazarr (1.6.1) and made smarter about where the truth lives.
+
+- **File inspection first.** Packarr now ffprobes library files itself (embedded audio + subtitle tracks *and* sidecar
+  files) with a path/size/mtime cache; Jellyfin is a fallback, Sonarr tags the last resort. `paths.library_maps` translates
+  Sonarr's roots when Packarr sees them elsewhere.
+- Jellyfin 12 ignores `AnyProviderIdEquals` and returns every series — the lookup now matches provider ids client-side
+  (it was returning the first series in the library for any id).
+- Bazarr: `packarr subs --limit N`; `bazarr.anime_profile_id` puts anime series on your en+ja Bazarr profile; a down or
+  restarting Bazarr no longer crashes the command.
+- Verified live: Packarr-initiated requests run through Bazarr's job queue and provider search (Gestdown), and Packarr
+  recognises the `.eng.hi.srt` Bazarr writes back.
+
+
 ## 0.2.0 — 2026-09-16
 
 First feature request, same day: subtitles.

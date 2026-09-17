@@ -43,6 +43,65 @@ def streams(path: str) -> dict:
 _LANG_ALIASES = {"eng": {"eng", "en", "english"}, "jpn": {"jpn", "ja", "japanese"}}
 
 
+SUB_EXT = (".srt", ".ass", ".ssa", ".sub", ".vtt", ".sup")
+_SUB_LANG = {"eng": "eng", "en": "eng", "english": "eng", "jpn": "jpn", "ja": "jpn", "japanese": "jpn", "fre": "fre", "fr": "fre", "ger": "ger", "de": "ger",
+             "spa": "spa", "es": "spa", "por": "por", "pt": "por", "pb": "por", "ita": "ita", "it": "ita", "rus": "rus", "ru": "rus", "chi": "chi", "zh": "chi", "kor": "kor", "ko": "kor"}
+
+
+def sidecar_subs(video_path: str) -> list[str]:
+    """Languages of external subtitle files next to the video: `Show - S01E01.eng.srt`, `.en.hi.srt`, `.ja.forced.ass`, plain `.srt` = und."""
+    d = os.path.dirname(video_path) or "."
+    stem = os.path.splitext(os.path.basename(video_path))[0]
+    out = []
+    try:
+        names = os.listdir(d)
+    except OSError:
+        return out
+    for n in names:
+        if not n.startswith(stem) or not n.lower().endswith(SUB_EXT):
+            continue
+        rest = n[len(stem):].lower()
+        toks = [t for t in rest.split(".") if t and t not in ("hi", "sdh", "forced", "cc", "default")][:-1]  # drop the extension
+        out.append(next((_SUB_LANG[t] for t in toks if t in _SUB_LANG), "und"))
+    return out
+
+
+class ProbeCache:
+    """ffprobe results keyed by (path, size, mtime) so a library sweep only probes files that changed."""
+
+    def __init__(self, path: str):
+        self.path = path
+        try:
+            with open(path, encoding="utf-8") as fh:
+                self.data = json.load(fh)
+        except Exception:
+            self.data = {}
+        self.dirty = False
+
+    def inspect(self, local_path: str) -> dict | None:
+        try:
+            st = os.stat(local_path)
+        except OSError:
+            return None  # not reachable from here: caller falls back to Jellyfin / Sonarr tags
+        key = f"{local_path}|{st.st_size}|{int(st.st_mtime)}"
+        if key not in self.data:
+            s = streams(local_path)
+            self.data[key] = None if "error" in s else {"audio": s["audio"], "subs": s["subs"], "height": s["height"]}
+            self.dirty = True
+        info = self.data[key]
+        if info is None:
+            return None
+        return {**info, "subs": info["subs"] + sidecar_subs(local_path)}  # sidecars are cheap to list and change without the video changing
+
+    def save(self) -> None:
+        if self.dirty:
+            tmp = self.path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as fh:
+                json.dump(self.data, fh)
+            os.replace(tmp, self.path)
+            self.dirty = False
+
+
 def has_language(tags: list[str], lang: str) -> bool:
     """Do any of these stream language tags mean `lang`? Groups write 'eng', 'en' or 'English'."""
     want = _LANG_ALIASES.get(lang, {lang})

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "packarr"
-version = "0.2.0"
+version = "0.2.1"
 description = "Season & series packs for anime, mapped right and imported through Sonarr."
 readme = "README.md"
 license = { text = "MIT" }
