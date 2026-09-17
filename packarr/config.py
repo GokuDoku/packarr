@@ -69,6 +69,12 @@ class QBittorrent:
 
 
 @dataclass
+class Sabnzbd(Service):
+    category: str = ""  # SABnzbd category to file packarr's downloads under (blank = Default)
+    timeout: int = 240
+
+
+@dataclass
 class Paths:
     downloads_local: str = "/downloads"  # the completed-downloads folder as Packarr sees it
     downloads_client: str = "/downloads"  # the same folder as the download client sees it
@@ -115,20 +121,27 @@ class Auto:
 
 
 @dataclass
+class Web:
+    listen: str = "0.0.0.0:7878"  # `packarr web` - approve/hand-map held jobs from a browser instead of the CLI
+
+
+@dataclass
 class Config:
     sonarr: Service = field(default_factory=Service)
     radarr: Radarr = field(default_factory=Radarr)
     prowlarr: Prowlarr = field(default_factory=Prowlarr)
     jellyfin: Service = field(default_factory=Service)
     bazarr: Bazarr = field(default_factory=Bazarr)
-    download_client: str = "transmission"  # "transmission" or "qbittorrent"
+    download_client: str = "transmission"  # "transmission", "qbittorrent" or "sabnzbd"
     transmission: Transmission = field(default_factory=Transmission)
     qbittorrent: QBittorrent = field(default_factory=QBittorrent)
+    sabnzbd: Sabnzbd = field(default_factory=Sabnzbd)
     paths: Paths = field(default_factory=Paths)
     limits: Limits = field(default_factory=Limits)
     languages: Languages = field(default_factory=Languages)
     search: Search = field(default_factory=Search)
     auto: Auto = field(default_factory=Auto)
+    web: Web = field(default_factory=Web)
     trackers: list[str] = field(default_factory=lambda: [
         "udp://tracker.opentrackr.org:1337/announce",
         "udp://open.stealth.si:80/announce",
@@ -163,8 +176,8 @@ def load(path: str | None = None) -> Config:
     cfg = _fill(Config, data)
     if not cfg.sonarr.enabled:
         raise SystemExit("config: sonarr.url and sonarr.api_key are required")
-    if cfg.download_client not in ("transmission", "qbittorrent"):
-        raise SystemExit(f"config: download_client must be transmission or qbittorrent, not {cfg.download_client!r}")
+    if cfg.download_client not in ("transmission", "qbittorrent", "sabnzbd"):
+        raise SystemExit(f"config: download_client must be transmission, qbittorrent or sabnzbd, not {cfg.download_client!r}")
     os.makedirs(cfg.paths.state_dir, exist_ok=True)
     return cfg
 
@@ -196,7 +209,7 @@ bazarr:                       # optional - fetch missing subtitle languages for 
   fill_after_import: true
   anime_profile_id: 0         # a Bazarr language profile (e.g. English + Japanese) to enforce on Sonarr's anime series
 
-download_client: transmission   # or qbittorrent - only the matching block below is used
+download_client: transmission   # or qbittorrent, or sabnzbd - only the matching block below is used
 
 transmission:
   url: http://transmission:9091/transmission/rpc
@@ -207,6 +220,11 @@ qbittorrent:
   url: http://qbittorrent:8080
   username: admin
   password: ${QBITTORRENT_PASSWORD}
+
+sabnzbd:                        # --abs/--dirs supported: paused, trimmed via get_files/delete_nzf, then resumed
+  url: http://sabnzbd:8080
+  api_key: ${SABNZBD_API_KEY}
+  category: ""                  # optional SABnzbd category to file packarr's downloads under
 
 paths:
   downloads_local: /downloads   # completed-downloads folder as Packarr sees it (mount it into the container)
@@ -238,6 +256,9 @@ auto:
   listen: 0.0.0.0:7979
   min_months_ended: 2
   notify_url: ""               # ntfy/Apprise/webhook URL that receives held plans
+
+web:
+  listen: 0.0.0.0:7878         # `packarr web` - approve/hand-map held jobs from a browser
 
 # anidb_cache_dir: /config/anidb-http   # optional Shoko-style AniDB dump for special-episode titles
 """

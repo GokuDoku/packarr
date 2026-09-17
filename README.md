@@ -12,7 +12,7 @@
 
 <p align="center">
   <b>Season &amp; series packs for anime — mapped right, imported through Sonarr.</b><br>
-  <sub>Sonarr can't parse a 74-episode batch. Nyaa is full of them. Packarr is the bridge. Transmission or qBittorrent.</sub>
+  <sub>Sonarr can't parse a 74-episode batch. Nyaa is full of them. Packarr is the bridge. Transmission, qBittorrent, or SABnzbd.</sub>
 </p>
 
 <p align="center">
@@ -49,11 +49,11 @@ proposed plan on disk for you to approve or hand-map. Nothing is guessed into yo
 | ✅ **Verify before import** | Runtime vs TVDB runtime, duplicate targets, files-per-season, season-size cross-check. Wrong → held, never imported. |
 | 📥 **Through Sonarr, not around it** | `ManualImport` with explicit episode ids, pack-title quality, explicit language tags so your custom formats fire. |
 | 🎬 **Movies & OVAs routed** | S00 special by TVDB title, else Radarr (added if new). Never duplicates, never overwrites a shared file. |
-| 🎯 **Selective pulls** | `--abs 542-574` or `--dirs S03P01,S03P02` — pull 13 GB out of a 45 GB pack, unwanted files never allocate. Transmission **and qBittorrent**. |
+| 🎯 **Selective pulls** | `--abs 542-574` or `--dirs S03P01,S03P02` — pull 13 GB out of a 45 GB pack, unwanted files never allocate. All three clients. |
 | 🧠 **Language-aware** | Only re-imports episodes that lack the audio you want (Jellyfin's real streams when configured). `--all` for one consistent encode. |
 | 💬 **Subtitle-aware** | `languages.subtitles: [eng, jpn]` — an episode only counts as done when its file carries those subtitle tracks too; packs advertising multi-subs rank higher; `subtitles_required` holds packs without them. |
 | 📝 **Subtitles without re-downloading** | `packarr subs --fetch` finds every file missing a wanted subtitle language and asks **Bazarr** to fetch just those — automatically after each pack import when Bazarr is configured. |
-| ⏸️ **Held plans you can fix** | `packarr plan`, `packarr approve --map file=episodeId`. Hand maps beat every filter. |
+| ⏸️ **Held plans you can fix** | `packarr plan` / `approve --map`, or `packarr web` for the same thing in a browser. Hand maps beat every filter. |
 | 🤖 **Auto mode (opt-in)** | Sonarr "On Series Add" webhook → is it pack-worthy? → grab the best pack → cancel the racing usenet searches. Dry-run by default. |
 | 💾 **Disk-budget aware** | Counts pre-allocated bytes, keeps a free-space floor, caps concurrency. |
 | 🪶 **Tiny** | One dependency (PyYAML), plain `urllib`, ffprobe. Reads top to bottom. |
@@ -94,7 +94,7 @@ packarr status                                      # queued → downloading →
 
 That's it. The tick downloads it, plans it, imports what's needed, routes the movie to Radarr, deletes the folder.
 
-> **Three views of one folder.** Packarr, Transmission and Sonarr may each see the completed-downloads folder at a
+> **Three views of one folder.** Packarr, the download client and Sonarr may each see the completed-downloads folder at a
 > different path. Set all three under `paths:` — everything else follows from that.
 
 ## 🔬 How it works
@@ -112,8 +112,9 @@ flowchart LR
 ```
 
 1. **Plan** — every video in the pack gets a proposed episode, in this order of authority: your hand map →
-   `--map` season remaps → the anime-lists resolver on the folder/pack title → `SxxEyy` / `2x11` in the filename →
-   season tokens + episode numbers → special titles.
+   `--map` season remaps → the anime-lists resolver on the folder/pack title (with [XEM](https://thexem.info) as a
+   second opinion when its table looks stale) → `SxxEyy` / `2x11` in the filename → season tokens + episode
+   numbers → special titles.
 2. **Verify** — runtime within 0.6–2.3× TVDB's, no two files on one episode, files-per-season ≤ episodes, mapping-table
    size == TVDB season size. Any failure holds the plan.
 3. **Import** — only the episodes that need it (missing, or lacking the wanted audio), via `ManualImport` with
@@ -129,16 +130,18 @@ The long version, with every rule and why it exists: **[docs/how-it-works.md](do
 | Command | What it does |
 |---|---|
 | `packarr init [path]` | write an example `packarr.yml` |
-| `packarr check` | test Sonarr, Transmission, optional Radarr/Jellyfin/Prowlarr, the downloads path and the mapping tables |
+| `packarr check` | test Sonarr, the configured download client (and its version), optional Radarr/Jellyfin/Prowlarr, the downloads path and the mapping tables |
 | `packarr search "<title>" [--episodes N] [--dual]` | ranked pack candidates; explains each score |
 | `packarr add <row\|magnet> --series <id>` | queue a pack. Options below. |
 | `packarr adopt <torrent id> --series <id>` | take over a torrent you added to the client by hand |
 | `packarr run [--interval S]` | one pipeline tick (cron), or a daemon |
 | `packarr status [--all]` | jobs and their state |
+| `packarr audit [--series <id>]` | files whose `SxxEyy` no longer matches Sonarr's current numbering for that episode (TVDB renumbered under you) - reports only, touches nothing |
 | `packarr plan <job>` | re-plan a job's folder and print the proposal without importing |
 | `packarr approve <job> [--map path=episodeId ...] [--map-file f.json] [--keep]` | release a held job, optionally with hand mappings |
 | `packarr subs [--series <id>] [--fetch]` | episodes whose files lack a wanted subtitle language; `--fetch` asks Bazarr for exactly those |
 | `packarr serve` | webhook listener for auto mode |
+| `packarr web` | browser UI for approving/hand-mapping held jobs — same as `approve --map`, without the terminal (`web.listen`, default `0.0.0.0:7878`) |
 
 **`add` options**
 
@@ -160,13 +163,14 @@ sonarr:      { url: http://sonarr:8989,   api_key: ${SONARR_API_KEY} }
 radarr:      { url: http://radarr:7878,   api_key: ${RADARR_API_KEY}, anime_root: /movies/anime, quality_profile: 1 }   # optional
 prowlarr:    { url: http://prowlarr:9696, api_key: ${PROWLARR_API_KEY}, indexer_ids: [1] }                            # search + auto
 jellyfin:    { url: http://jellyfin:8096, api_key: ${JELLYFIN_API_KEY} }                                              # optional
-download_client: transmission   # or qbittorrent
+download_client: transmission   # or qbittorrent, or sabnzbd
 transmission: { url: http://transmission:9091/transmission/rpc, username: "", password: "" }
 qbittorrent:  { url: http://qbittorrent:8080, username: admin, password: ${QBITTORRENT_PASSWORD} }
+sabnzbd:      { url: http://sabnzbd:8080, api_key: ${SABNZBD_API_KEY}, category: "" }   # --abs/--dirs not yet supported here
 
 paths:
   downloads_local:  /downloads   # as Packarr sees it
-  downloads_client: /downloads   # as Transmission sees it
+  downloads_client: /downloads   # as the download client sees it
   downloads_sonarr: /downloads   # as Sonarr/Radarr see it
   state_dir: /config
 
@@ -175,6 +179,7 @@ languages: { wanted: eng, tag: [English, Japanese], subtitles: [eng, jpn], subti
 bazarr:    { url: http://bazarr:6767, api_key: ${BAZARR_API_KEY}, fill_after_import: true }                          # optional
 search:    { min_seeders: 2, prefer_groups: [Judas, EMBER, "Anime Time", DB, Cleo, YakuboEncodes, bonkai77] }
 auto:      { enabled: false, dry_run: true, listen: 0.0.0.0:7979, min_months_ended: 2, notify_url: "" }
+web:       { listen: 0.0.0.0:7878 }   # `packarr web` — no login built in; keep it behind your own network/proxy
 ```
 
 **Sonarr side (recommended):** a custom format that requires *languages: English + Japanese* scored high enough to
@@ -230,12 +235,27 @@ files into the right TVDB slot. Different trade.
 </details>
 
 <details>
+<summary><b>What does XEM actually do here?</b></summary>
+
+Anime-lists' AniDB→TVDB table goes stale whenever TVDB re-cuts a show's seasons (merges two AniDB seasons into
+one, renumbers a season's episode count) — the table still describes the *old* cut. Packarr already detects this
+(a mapped range's size stops matching the real TVDB season size) and had three positional/by-size guesses to fall
+back on. Now, exactly when that staleness is detected, it asks [XEM](https://thexem.info) — the same
+scene-numbering database Sonarr itself uses — for its own AniDB→TVDB mapping of that one episode, and prefers it
+over the guesses when XEM has an answer and that answer names a real episode. XEM's anime coverage is far from
+universal, so the positional/by-size guesses remain the fallback when it doesn't. This never runs on the common
+path — only when anime-lists and TVDB already disagree.
+</details>
+
+<details>
 <summary><b>Why does a plan get HELD?</b></summary>
 
 Because something didn't add up: a file's runtime is wrong for its episode, two files claim one episode, a folder
 has more files than the season has episodes, or a numbered file has no target. Run `packarr plan <job>`, read the
-`reason`/`note` per row, then `packarr approve <job> --map "<rel path>=<episode id>"` for the ones you can settle.
-The pack stays on disk, stopped, until you do. See the [field notes](docs/field-notes.md) for the usual suspects.
+`reason`/`note` per row, then `packarr approve <job> --map "<rel path>=<episode id>"` for the ones you can settle -
+or run `packarr web` and do the same thing from a browser: a table of the offending files, a dropdown of the
+series' episodes for each, and an Approve button. Either way the pack stays on disk, stopped, until you do. See the
+[field notes](docs/field-notes.md) for the usual suspects.
 </details>
 
 <details>
@@ -249,10 +269,17 @@ is the truth.
 <details>
 <summary><b>qBittorrent / SABnzbd?</b></summary>
 
-Transmission and qBittorrent (4.x and 5.x) — set `download_client: qbittorrent` and fill the `qbittorrent:` block.
-Selective pulls work on both: qBittorrent adds the torrent stopped, sets the unwanted files to priority 0, then starts
-it, so nothing unwanted is ever allocated. Both clients live behind one small interface (`packarr/clients/`); SABnzbd /
-usenet packs are the next roadmap item.
+All three — Transmission, qBittorrent (4.x and 5.x), and SABnzbd. Set `download_client:` and fill in the matching
+block. All three live behind one small interface (`packarr/clients/`).
+
+Selective pulls (`--abs`/`--dirs`) work on all three, though the mechanism differs. Transmission/qBittorrent: the
+pipeline reads the pack's file list from raw `.torrent` bytes, adds the torrent stopped, sets unwanted files to
+priority 0, then starts it. SABnzbd: the pipeline reads the file list straight out of the NZB's own XML (each
+file's real name is the quoted token in its `subject`, a long-standing posting convention — no bencode-style
+parser needed), adds the job paused, removes the unwanted files via `get_files`/`delete_nzf`, then resumes it.
+Either way, nothing unwanted is ever allocated. Verified against SABnzbd's own API reference and against the
+NZB-subject filename convention independently used by several other NZB parsers, plus unit tests — but unlike the
+qBittorrent client, none of it has touched a live SABnzbd yet. Please report what you see.
 </details>
 
 <details>
@@ -273,18 +300,26 @@ broke a previous rule (an `S3_-_07` that mapped to season 1, a `2x11` naming sty
 pack with a *Crystal* subfolder, a US-numbered Pokémon set …). Add yours with the fixture helpers in
 `tests/conftest.py`.
 
+`tests/bats/` covers the packaged CLI itself — argument parsing, config validation, `packarr web` answering real
+HTTP on loopback — the seam between the pieces pytest tests in isolation. Needs [bats-core](https://github.com/bats-core/bats-core)
+and `curl`; run with `bats tests/bats`. No live Sonarr or download client either.
+
 ## 🗺️ Roadmap
 
 - [x] subtitle targeting + Bazarr fill (v0.2.0, first user request)
 - [x] qBittorrent client (v0.3.0, tested against 5.2.3)
-- [ ] SABnzbd / usenet packs
-- [ ] web page for held plans (approve / map in the browser)
-- [ ] XEM as a second opinion when anime-lists and TVDB disagree
-- [ ] `packarr audit` — find episodes whose filename `SxxEyy` no longer matches their Sonarr episode (TVDB renumbered under you)
+- [x] SABnzbd / usenet packs (v0.4.0, whole-pack only — not yet tested against a live SABnzbd)
+- [x] web page for held plans (v0.5.0, `packarr web` — approve/map from a browser, no login built in)
+- [x] selective pulls (`--abs`/`--dirs`) for SABnzbd (v0.6.0, reads the NZB's own file list — not yet tested against a live SABnzbd)
+- [x] XEM as a second opinion when anime-lists and TVDB disagree (v0.7.0)
+- [x] `packarr audit` — find episodes whose filename `SxxEyy` no longer matches their Sonarr episode (TVDB renumbered under you) (v0.8.0)
+
+Everything from the original list is shipped. Open an issue (or a PR) if there's a next one.
 
 ## 🤝 Credits
 
 - [Anime-Lists/anime-lists](https://github.com/Anime-Lists/anime-lists) and [Fribb/anime-lists](https://github.com/Fribb/anime-lists) — the mapping tables. Fix wrong mappings *there*; every tool benefits.
+- [TheXEM](https://thexem.info) — scene/AniDB↔TVDB numbering, consulted as a second opinion when anime-lists' table looks stale.
 - [AniList](https://anilist.co) — title search.
 - [Sonarr](https://sonarr.tv), [Radarr](https://radarr.video), [Prowlarr](https://prowlarr.com), [Transmission](https://transmissionbt.com) — the stack.
 - [TRaSH Guides](https://trash-guides.info) — custom-format thinking.

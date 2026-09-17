@@ -13,7 +13,7 @@ services:
       - JELLYFIN_API_KEY=${JELLYFIN_API_KEY}
     volumes:
       - ./packarr:/config                      # packarr.yml, jobs.json, plans/, mapping tables
-      - /path/to/torrents/complete:/downloads  # the SAME folder Transmission and Sonarr see (set paths.* in packarr.yml)
+      - /path/to/torrents/complete:/downloads  # the SAME folder the download client and Sonarr see (set paths.* in packarr.yml)
 
   packarr-hook:
     image: ghcr.io/gokudoku/packarr:latest
@@ -28,3 +28,15 @@ services:
       - /path/to/torrents/complete:/downloads
     ports:
       - "7979:7979"
+
+  packarr-web:                             # optional: browser UI for approving/hand-mapping held jobs
+    image: ghcr.io/gokudoku/packarr:latest
+    container_name: packarr-web
+    restart: unless-stopped
+    command: ["packarr", "web"]
+    environment:
+      - SONARR_API_KEY=${SONARR_API_KEY}
+    volumes:
+      - ./packarr:/config
+    ports:
+      - "7878:7878"                        # keep this behind your own auth/reverse proxy - no login built in
