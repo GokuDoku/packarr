@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0 — 2026-09-17
+
+- **qBittorrent support** (`download_client: qbittorrent`), 4.x and 5.x Web API. Same interface as the Transmission
+  client; selective pulls add the torrent stopped, set unwanted files to priority 0, then start it, so unwanted files
+  never allocate. Tested live against qBittorrent 5.2.3: selective add (3 of 12 files excluded, 1.6 MB on disk of a
+  440 MB torrent), progress/status/peers/tracker mapping, stop/start (5.x `start`/`stop`, 4.x `resume`/`pause`
+  fallback), reannounce, remove with data. Requested in #1.
+- `packarr check` names the active download client and its version.
+
+
 ## 0.2.1 — 2026-09-16
 
 Tested against a live Bazarr (1.6.1) and made smarter about where the truth lives.

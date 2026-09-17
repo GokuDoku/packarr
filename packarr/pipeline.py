@@ -22,6 +22,7 @@ from . import parsing as P
 from . import probe, torrentfile
 from .clients.bazarr import Bazarr
 from .clients.jellyfin import Jellyfin
+from .clients.qbittorrent import QBittorrent
 from .clients.radarr import Radarr
 from .clients.sonarr import Sonarr, languages
 from .clients.transmission import DOWNLOAD, DOWNLOAD_WAIT, Transmission
@@ -43,7 +44,10 @@ class Pipeline:
         self.radarr = Radarr(cfg.radarr.url, cfg.radarr.api_key) if cfg.radarr.enabled else None
         self.jellyfin = Jellyfin(cfg.jellyfin.url, cfg.jellyfin.api_key) if cfg.jellyfin.enabled else None
         self.bazarr = Bazarr(cfg.bazarr.url, cfg.bazarr.api_key) if cfg.bazarr.enabled else None
-        self.tr = Transmission(cfg.transmission.url, cfg.transmission.username, cfg.transmission.password, cfg.transmission.timeout)
+        if cfg.download_client == "qbittorrent":
+            self.tr = QBittorrent(cfg.qbittorrent.url, cfg.qbittorrent.username, cfg.qbittorrent.password, cfg.qbittorrent.timeout)
+        else:
+            self.tr = Transmission(cfg.transmission.url, cfg.transmission.username, cfg.transmission.password, cfg.transmission.timeout)
         self.resolver = Resolver(cfg.paths.state_dir, cfg.anidb_cache_dir)
         self.planner = Planner(self.resolver, lambda sid: self.sonarr.episodes(sid), probe.duration_min, self.to_local)
         self.router = Router(self.sonarr, self.radarr, cfg.radarr.anime_root, cfg.radarr.quality_profile)

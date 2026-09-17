@@ -38,10 +38,11 @@ def cmd_check(args):
         print(f"sonarr      FAIL {e}")
         ok = False
     try:
-        pipe.tr.torrents(fields=["id"])
-        print("transmission ok")
+        n = len(pipe.tr.torrents(fields=["id"]))
+        ver = f" {pipe.tr.version()}" if hasattr(pipe.tr, "version") else ""
+        print(f"{cfg.download_client:12s}ok{ver}  ({n} torrents)")
     except Exception as e:
-        print(f"transmission FAIL {e}")
+        print(f"{cfg.download_client:12s}FAIL {e}")
         ok = False
     for name, svc in (("radarr", pipe.radarr), ("jellyfin", pipe.jellyfin), ("bazarr", pipe.bazarr)):
         print(f"{name:12s}{'configured' if svc else 'not configured (optional)'}")

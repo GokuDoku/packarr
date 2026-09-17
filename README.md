@@ -12,7 +12,7 @@
 
 <p align="center">
   <b>Season &amp; series packs for anime — mapped right, imported through Sonarr.</b><br>
-  <sub>Sonarr can't parse a 74-episode batch. Nyaa is full of them. Packarr is the bridge.</sub>
+  <sub>Sonarr can't parse a 74-episode batch. Nyaa is full of them. Packarr is the bridge. Transmission or qBittorrent.</sub>
 </p>
 
 <p align="center">
@@ -49,7 +49,7 @@ proposed plan on disk for you to approve or hand-map. Nothing is guessed into yo
 | ✅ **Verify before import** | Runtime vs TVDB runtime, duplicate targets, files-per-season, season-size cross-check. Wrong → held, never imported. |
 | 📥 **Through Sonarr, not around it** | `ManualImport` with explicit episode ids, pack-title quality, explicit language tags so your custom formats fire. |
 | 🎬 **Movies & OVAs routed** | S00 special by TVDB title, else Radarr (added if new). Never duplicates, never overwrites a shared file. |
-| 🎯 **Selective pulls** | `--abs 542-574` or `--dirs S03P01,S03P02` — pull 13 GB out of a 45 GB pack, unwanted files never allocate. |
+| 🎯 **Selective pulls** | `--abs 542-574` or `--dirs S03P01,S03P02` — pull 13 GB out of a 45 GB pack, unwanted files never allocate. Transmission **and qBittorrent**. |
 | 🧠 **Language-aware** | Only re-imports episodes that lack the audio you want (Jellyfin's real streams when configured). `--all` for one consistent encode. |
 | 💬 **Subtitle-aware** | `languages.subtitles: [eng, jpn]` — an episode only counts as done when its file carries those subtitle tracks too; packs advertising multi-subs rank higher; `subtitles_required` holds packs without them. |
 | 📝 **Subtitles without re-downloading** | `packarr subs --fetch` finds every file missing a wanted subtitle language and asks **Bazarr** to fetch just those — automatically after each pack import when Bazarr is configured. |
@@ -160,7 +160,9 @@ sonarr:      { url: http://sonarr:8989,   api_key: ${SONARR_API_KEY} }
 radarr:      { url: http://radarr:7878,   api_key: ${RADARR_API_KEY}, anime_root: /movies/anime, quality_profile: 1 }   # optional
 prowlarr:    { url: http://prowlarr:9696, api_key: ${PROWLARR_API_KEY}, indexer_ids: [1] }                            # search + auto
 jellyfin:    { url: http://jellyfin:8096, api_key: ${JELLYFIN_API_KEY} }                                              # optional
+download_client: transmission   # or qbittorrent
 transmission: { url: http://transmission:9091/transmission/rpc, username: "", password: "" }
+qbittorrent:  { url: http://qbittorrent:8080, username: admin, password: ${QBITTORRENT_PASSWORD} }
 
 paths:
   downloads_local:  /downloads   # as Packarr sees it
@@ -247,8 +249,10 @@ is the truth.
 <details>
 <summary><b>qBittorrent / SABnzbd?</b></summary>
 
-Transmission today. The client is one small class (`packarr/clients/transmission.py`) behind the pipeline; a
-qBittorrent port is a welcome PR — the pipeline only needs add/list/stop/start/remove and per-file selection.
+Transmission and qBittorrent (4.x and 5.x) — set `download_client: qbittorrent` and fill the `qbittorrent:` block.
+Selective pulls work on both: qBittorrent adds the torrent stopped, sets the unwanted files to priority 0, then starts
+it, so nothing unwanted is ever allocated. Both clients live behind one small interface (`packarr/clients/`); SABnzbd /
+usenet packs are the next roadmap item.
 </details>
 
 <details>
@@ -272,7 +276,7 @@ pack with a *Crystal* subfolder, a US-numbered Pokémon set …). Add yours with
 ## 🗺️ Roadmap
 
 - [x] subtitle targeting + Bazarr fill (v0.2.0, first user request)
-- [ ] qBittorrent client
+- [x] qBittorrent client (v0.3.0, tested against 5.2.3)
 - [ ] SABnzbd / usenet packs
 - [ ] web page for held plans (approve / map in the browser)
 - [ ] XEM as a second opinion when anime-lists and TVDB disagree
