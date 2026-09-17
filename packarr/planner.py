@@ -51,6 +51,8 @@ class Planner:
         remap = {int(a): (int(b), int(c)) for a, b, c in job.get("map") or []}  # src season -> (dst season, ep offset)
         plan: list[dict] = []
         issues: list[str] = []
+        if not any(e["seasonNumber"] > 0 for e in eps):
+            issues.append("Sonarr has no episodes for this series yet (refresh pending?)")  # never treat a whole pack as extras
         folder_res: dict[str, dict | None] = {}
         other_eps: dict[int, tuple] = {}
 

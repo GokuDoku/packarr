@@ -184,3 +184,10 @@ def test_stale_table_with_numbered_default_season_stays_in_that_season(make_plan
     assert not issues
     m = mapping(plan)
     assert m[files[0]] == (1, 27) and m[files[1]] == (1, 5)
+
+
+def test_series_without_episodes_is_held_not_binned(make_planner):
+    """A freshly added series has no episode list for a minute; the pack must be held, not treated as 13 extras and deleted."""
+    pl = make_planner()
+    plan, issues = pl.plan(job("Arifureta", 357019), items([f"[EMBER] Arifureta - S01E{n:02d}.mkv" for n in range(1, 14)]), [], {})
+    assert issues and "no episodes" in issues[0]
