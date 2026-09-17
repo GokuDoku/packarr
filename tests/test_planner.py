@@ -191,3 +191,17 @@ def test_series_without_episodes_is_held_not_binned(make_planner):
     pl = make_planner()
     plan, issues = pl.plan(job("Arifureta", 357019), items([f"[EMBER] Arifureta - S01E{n:02d}.mkv" for n in range(1, 14)]), [], {})
     assert issues and "no episodes" in issues[0]
+
+
+def test_stale_table_prefers_the_season_whose_size_matches(make_planner):
+    """Hetalia World Series: the table says TVDB S3, but TVDB renumbered - the 48-episode season is S2."""
+    maps = [{"anidbseason": 1, "tvdbseason": 3, "start": 1, "end": 24, "offset": 0, "pairs": {}},
+            {"anidbseason": 1, "tvdbseason": 4, "start": 25, "end": 48, "offset": -24, "pairs": {}}]
+    res = FakeResolver({"Hetalia World Series": entry(88161, 3, 0, 48, "Hetalia World Series", maps)})
+    pl = make_planner(res)
+    eps = episodes({1: 52, 2: 48, 3: 25, 4: 15})
+    files = ["Hetalia World Series/Hetalia_World_Series_Ep07_(AAAA0000).mkv", "Hetalia World Series/Hetalia_World_Series_Ep40_(BBBB0000).mkv"]
+    plan, issues = pl.plan(job("Hetalia - Axis Powers", 88161), items(files), eps, {})
+    assert not issues
+    m = mapping(plan)
+    assert m[files[0]] == (2, 7) and m[files[1]] == (2, 40)

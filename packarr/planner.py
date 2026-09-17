@@ -196,6 +196,10 @@ class Planner:
                         if stale and tv[0] != "abs" and res.get("season") == "a":
                             tv = ("abs", n + res["offset"])
                             row["note"] = "stale anime-lists table; positional"
+                        elif stale and tv[0] != "abs" and res.get("episodes") and len([sn for sn, c in _sc.items() if sn > 0 and c == res["episodes"]]) == 1 \
+                                and (next(sn for sn, c in _sc.items() if sn > 0 and c == res["episodes"]), n + res["offset"]) in _byse:
+                            tv = (next(sn for sn, c in _sc.items() if sn > 0 and c == res["episodes"]), n + res["offset"])  # renumbered: the season whose size matches
+                            row["note"] = "stale anime-lists table; season by size"
                         elif stale and tv[0] != "abs" and res.get("season") not in (None, "", "a"):
                             ds = (int(res["season"]), n + res["offset"])  # TVDB merged two table seasons into one (Hetalia S1 = 52 eps)
                             if ds in _byse and tv != ds:
