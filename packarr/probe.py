@@ -35,12 +35,23 @@ def streams(path: str) -> dict:
     except Exception:
         return {"error": f"ffprobe failed on {os.path.basename(path)}"}
     audio = [(x.get("tags") or {}).get("language", "und") + ((":" + (x.get("tags") or {}).get("title", "")) if (x.get("tags") or {}).get("title") else "") for x in st if x["codec_type"] == "audio"]
+    subs = [(x.get("tags") or {}).get("language", "und") for x in st if x["codec_type"] == "subtitle"]
     vid = [x for x in st if x["codec_type"] == "video" and x["codec_name"] not in ("mjpeg", "png", "bmp", "gif", "webp")]  # cover art is not a video track
-    return {"height": vid[0]["height"] if vid else 0, "codec": vid[0]["codec_name"] if vid else "?", "audio": audio}
+    return {"height": vid[0]["height"] if vid else 0, "codec": vid[0]["codec_name"] if vid else "?", "audio": audio, "subs": subs}
 
 
-def sample_pack(root: str, wanted: str = "eng") -> tuple[bool, str]:
-    """Probe first/middle/last episode file: do they carry the wanted audio? Informational - the release name decides."""
+_LANG_ALIASES = {"eng": {"eng", "en", "english"}, "jpn": {"jpn", "ja", "japanese"}}
+
+
+def has_language(tags: list[str], lang: str) -> bool:
+    """Do any of these stream language tags mean `lang`? Groups write 'eng', 'en' or 'English'."""
+    want = _LANG_ALIASES.get(lang, {lang})
+    return any(t.split(":")[0].lower() in want for t in tags)
+
+
+def sample_pack(root: str, wanted: str = "eng", subtitles: list[str] | None = None) -> tuple[bool, str, list[str]]:
+    """Probe first/middle/last episode file: do they carry the wanted audio, and the wanted subtitle languages?
+    Returns (audio_ok, summary, missing_subtitle_langs). Informational unless `languages.subtitles_required`."""
     vids = []
     for dp, _, fs in os.walk(root):
         vids += [os.path.join(dp, f) for f in fs if P.is_video(f)]
@@ -49,12 +60,15 @@ def sample_pack(root: str, wanted: str = "eng") -> tuple[bool, str]:
     if not vids:
         return False, "no video files"
     sample = [vids[0], vids[len(vids) // 2], vids[-1]] if len(vids) > 2 else vids
-    summ, bad = [], 0
+    summ, bad, missing = [], 0, set()
     for v in dict.fromkeys(sample):
         s = streams(v)
         if "error" in s:
-            return False, s["error"]
-        summ.append(f"{os.path.basename(v)[:40]}: {s['codec']} {s['height']}p audio={s['audio']}")
-        if not any(a.lower().startswith(wanted) for a in s["audio"]):
+            return False, s["error"], []
+        summ.append(f"{os.path.basename(v)[:40]}: {s['codec']} {s['height']}p audio={s['audio']} subs={s['subs']}")
+        if not has_language(s["audio"], wanted):
             bad += 1
-    return bad <= len(summ) // 2, "; ".join(summ)
+        for lang in subtitles or []:
+            if not has_language(s["subs"], lang):
+                missing.add(lang)
+    return bad <= len(summ) // 2, "; ".join(summ), sorted(missing)

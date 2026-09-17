@@ -51,6 +51,8 @@ proposed plan on disk for you to approve or hand-map. Nothing is guessed into yo
 | 🎬 **Movies & OVAs routed** | S00 special by TVDB title, else Radarr (added if new). Never duplicates, never overwrites a shared file. |
 | 🎯 **Selective pulls** | `--abs 542-574` or `--dirs S03P01,S03P02` — pull 13 GB out of a 45 GB pack, unwanted files never allocate. |
 | 🧠 **Language-aware** | Only re-imports episodes that lack the audio you want (Jellyfin's real streams when configured). `--all` for one consistent encode. |
+| 💬 **Subtitle-aware** | `languages.subtitles: [eng, jpn]` — an episode only counts as done when its file carries those subtitle tracks too; packs advertising multi-subs rank higher; `subtitles_required` holds packs without them. |
+| 📝 **Subtitles without re-downloading** | `packarr subs --fetch` finds every file missing a wanted subtitle language and asks **Bazarr** to fetch just those — automatically after each pack import when Bazarr is configured. |
 | ⏸️ **Held plans you can fix** | `packarr plan`, `packarr approve --map file=episodeId`. Hand maps beat every filter. |
 | 🤖 **Auto mode (opt-in)** | Sonarr "On Series Add" webhook → is it pack-worthy? → grab the best pack → cancel the racing usenet searches. Dry-run by default. |
 | 💾 **Disk-budget aware** | Counts pre-allocated bytes, keeps a free-space floor, caps concurrency. |
@@ -135,6 +137,7 @@ The long version, with every rule and why it exists: **[docs/how-it-works.md](do
 | `packarr status [--all]` | jobs and their state |
 | `packarr plan <job>` | re-plan a job's folder and print the proposal without importing |
 | `packarr approve <job> [--map path=episodeId ...] [--map-file f.json] [--keep]` | release a held job, optionally with hand mappings |
+| `packarr subs [--series <id>] [--fetch]` | episodes whose files lack a wanted subtitle language; `--fetch` asks Bazarr for exactly those |
 | `packarr serve` | webhook listener for auto mode |
 
 **`add` options**
@@ -166,7 +169,8 @@ paths:
   state_dir: /config
 
 limits:    { max_active: 6, max_active_gb: 300, min_free_gb: 100 }
-languages: { wanted: eng, tag: [English, Japanese] }
+languages: { wanted: eng, tag: [English, Japanese], subtitles: [eng, jpn], subtitles_required: false }
+bazarr:    { url: http://bazarr:6767, api_key: ${BAZARR_API_KEY}, fill_after_import: true }                          # optional
 search:    { min_seeders: 2, prefer_groups: [Judas, EMBER, "Anime Time", DB, Cleo, YakuboEncodes, bonkai77] }
 auto:      { enabled: false, dry_run: true, listen: 0.0.0.0:7979, min_months_ended: 2, notify_url: "" }
 ```
@@ -174,6 +178,20 @@ auto:      { enabled: false, dry_run: true, listen: 0.0.0.0:7979, min_months_end
 **Sonarr side (recommended):** a custom format that requires *languages: English + Japanese* scored high enough to
 beat single-language files, and a low tiebreaker penalty (not −10000) on the "Anime LQ" group list — otherwise pack
 imports from Judas/EMBER/Anime Time can never be upgrades. Packarr stamps the languages; the CF does the rest.
+
+## 💬 Subtitles
+
+Audio was the original job; subtitles came from the first feature request. Two halves:
+
+1. **Targeting.** `languages.subtitles: [eng, jpn]` makes an episode count as "already good" only when its file carries
+   those subtitle tracks as well as the wanted audio (Jellyfin's stream data — Sonarr knows nothing about subtitles).
+   Search ranks releases that advertise `Multi-Subs`/`Eng Sub` higher, the post-download probe reports each file's
+   subtitle languages, and `languages.subtitles_required: true` holds a pack whose files lack one instead of importing it.
+2. **Filling, without re-downloading.** With `bazarr:` configured, `packarr subs --fetch` walks your anime (or one
+   `--series`), finds every file missing a wanted subtitle language, and asks Bazarr to fetch exactly those
+   episode/language pairs. It also runs automatically after each pack import (`bazarr.fill_after_import`). Bazarr does the
+   provider work (OpenSubtitles etc.) and writes the sidecar files; Packarr just tells it what's missing. Make sure the
+   languages are enabled in Bazarr's language profile for those series.
 
 ## 🤖 Auto mode
 
@@ -243,6 +261,7 @@ pack with a *Crystal* subfolder, a US-numbered Pokémon set …). Add yours with
 
 ## 🗺️ Roadmap
 
+- [x] subtitle targeting + Bazarr fill (v0.2.0, first user request)
 - [ ] qBittorrent client
 - [ ] SABnzbd / usenet packs
 - [ ] web page for held plans (approve / map in the browser)

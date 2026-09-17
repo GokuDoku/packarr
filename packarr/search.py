@@ -39,6 +39,9 @@ def score(row: dict, cfg: Search, episodes: int | None = None) -> tuple[int, lis
         s += 5
     if re.search(r"\b(bd|bluray|blu-ray|bdrip)\b", t, re.I):
         s += 5
+    if re.search(r"multi.?subs?|dual.?subs?|eng.?subs?|\bsubs?\b", t, re.I):
+        s += 3
+        why.append("subs")
     grp = re.match(r"\[([^\]]+)\]", t)
     if grp and any(g.lower() == grp.group(1).lower() for g in cfg.prefer_groups):
         s += 10

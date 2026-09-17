@@ -47,6 +47,11 @@ class Prowlarr(Service):
 
 
 @dataclass
+class Bazarr(Service):
+    fill_after_import: bool = True  # after a pack imports, ask Bazarr for any wanted subtitle language the files lack
+
+
+@dataclass
 class Transmission:
     url: str = "http://transmission:9091/transmission/rpc"
     username: str = ""
@@ -75,6 +80,8 @@ class Limits:
 class Languages:
     wanted: str = "eng"  # audio language that marks an episode as "already good"
     tag: list[str] = field(default_factory=lambda: ["English", "Japanese"])  # languages stamped on imported files
+    subtitles: list[str] = field(default_factory=list)  # subtitle languages an episode must ALSO carry to count as good, e.g. [eng, jpn]
+    subtitles_required: bool = False  # hold a pack whose sampled files lack any wanted subtitle language (otherwise: rank + log)
 
 
 @dataclass
@@ -103,6 +110,7 @@ class Config:
     radarr: Radarr = field(default_factory=Radarr)
     prowlarr: Prowlarr = field(default_factory=Prowlarr)
     jellyfin: Service = field(default_factory=Service)
+    bazarr: Bazarr = field(default_factory=Bazarr)
     transmission: Transmission = field(default_factory=Transmission)
     paths: Paths = field(default_factory=Paths)
     limits: Limits = field(default_factory=Limits)
@@ -168,6 +176,11 @@ jellyfin:                     # optional - lets Packarr skip episodes that alrea
   url: http://jellyfin:8096
   api_key: ${JELLYFIN_API_KEY}
 
+bazarr:                       # optional - fetch missing subtitle languages for files you already have (no re-download)
+  url: http://bazarr:6767
+  api_key: ${BAZARR_API_KEY}
+  fill_after_import: true
+
 transmission:
   url: http://transmission:9091/transmission/rpc
   username: ""
@@ -188,6 +201,8 @@ limits:
 languages:
   wanted: eng                  # episodes whose file already has this audio are left alone (unless --all)
   tag: [English, Japanese]     # stamped on every imported file so Sonarr's language custom formats fire
+  subtitles: []                # e.g. [eng, jpn]: an episode only counts as "good" if its file also has these subtitle tracks
+  subtitles_required: false    # true = hold a pack whose files lack a wanted subtitle language instead of importing it
 
 search:
   min_seeders: 2

@@ -44,7 +44,7 @@ def _tok(t: str) -> set[str]:
 
 
 class Resolver:
-    def __init__(self, state_dir: str, anidb_cache_dir: str = "", user_agent: str = "packarr/0.1 (+https://github.com/GokuDoku/packarr)"):
+    def __init__(self, state_dir: str, anidb_cache_dir: str = "", user_agent: str = "packarr/0.2 (+https://github.com/GokuDoku/packarr)"):
         self.dir = os.path.join(state_dir, "anime-lists")
         os.makedirs(self.dir, exist_ok=True)
         self.anidb_dir = anidb_cache_dir

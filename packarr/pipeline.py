@@ -20,6 +20,7 @@ import time
 
 from . import parsing as P
 from . import probe, torrentfile
+from .clients.bazarr import Bazarr
 from .clients.jellyfin import Jellyfin
 from .clients.radarr import Radarr
 from .clients.sonarr import Sonarr, languages
@@ -40,6 +41,7 @@ class Pipeline:
         self.sonarr = Sonarr(cfg.sonarr.url, cfg.sonarr.api_key)
         self.radarr = Radarr(cfg.radarr.url, cfg.radarr.api_key) if cfg.radarr.enabled else None
         self.jellyfin = Jellyfin(cfg.jellyfin.url, cfg.jellyfin.api_key) if cfg.jellyfin.enabled else None
+        self.bazarr = Bazarr(cfg.bazarr.url, cfg.bazarr.api_key) if cfg.bazarr.enabled else None
         self.tr = Transmission(cfg.transmission.url, cfg.transmission.username, cfg.transmission.password, cfg.transmission.timeout)
         self.resolver = Resolver(cfg.paths.state_dir, cfg.anidb_cache_dir)
         self.planner = Planner(self.resolver, lambda sid: self.sonarr.episodes(sid), probe.duration_min, self.to_local)
@@ -242,7 +244,7 @@ class Pipeline:
                 pass
             return 0
         eps = self.sonarr.episodes(job["seriesId"])
-        need = needed(self.sonarr, self.jellyfin, job["seriesId"], job["tvdb"], eps, self.cfg.languages.wanted)
+        need = needed(self.sonarr, self.jellyfin, job["seriesId"], job["tvdb"], eps, self.cfg.languages.wanted, self.cfg.languages.subtitles)
         files, skipped = [], 0
         q = P.pack_quality(job["title"])
         for r in mapped:
@@ -303,6 +305,38 @@ class Pipeline:
             self.tr.stop([t["id"]])
             return
         job.update(status="cleanup", cleanupAt=time.time() + self.cfg.limits.cleanup_delay_s)
+        if self.bazarr and self.cfg.bazarr.fill_after_import and self.cfg.languages.subtitles:
+            try:
+                n = self.fill_subtitles(job["seriesId"], job["tvdb"])
+                log(f"[{job['series']}] asked Bazarr for {n} missing subtitle track(s)")
+            except Exception as e:
+                log(f"[{job['series']}] bazarr fill failed: {e}")
+
+    # ---- subtitles without re-downloading -------------------------------------------------------------
+    def missing_subtitles(self, series_id: int, tvdb_id: int) -> list[tuple[dict, str]]:
+        """[(episode, lang)] for every episode whose file lacks a wanted subtitle language (Jellyfin's stream data)."""
+        wanted = self.cfg.languages.subtitles
+        if not wanted or not self.jellyfin:
+            return []
+        eps = [e for e in self.sonarr.episodes(series_id) if e.get("hasFile")]
+        out = []
+        for lang in wanted:
+            have = self.jellyfin.episodes_with_audio(tvdb_id, "und", [lang])  # "und" = any audio: only the subtitle track matters here
+            if have is None:
+                return []
+            out += [(e, lang) for e in eps if (e["seasonNumber"], e["episodeNumber"]) not in have]
+        return out
+
+    def fill_subtitles(self, series_id: int, tvdb_id: int) -> int:
+        """Ask Bazarr to fetch each missing (episode, language). Returns how many requests were made."""
+        if not self.bazarr:
+            return 0
+        n = 0
+        for e, lang in self.missing_subtitles(series_id, tvdb_id):
+            ok, why = self.bazarr.download(series_id, e["id"], lang)
+            log(f"  bazarr S{e['seasonNumber']:02d}E{e['episodeNumber']:02d} {lang}: {why}")
+            n += ok
+        return n
 
     # ---- the tick ----------------------------------------------------------------------------------
     def run(self) -> None:
@@ -344,10 +378,24 @@ class Pipeline:
                     if t["percentDone"] < 1:
                         log(f"#{t['id']} {t['percentDone'] * 100:.1f}% {t['rateDownload'] / 1e6:.1f} MB/s eta {t['eta']}s  {t['name'][:60]}")
                         continue
+                    missing_subs: list[str] = []
                     try:
-                        log(f"#{t['id']} tracks: {probe.sample_pack(os.path.join(self.cfg.paths.downloads_local, t['name']), self.cfg.languages.wanted)[1]}")
+                        _ok, summary, missing_subs = probe.sample_pack(os.path.join(self.cfg.paths.downloads_local, t['name']),
+                                                                       self.cfg.languages.wanted, self.cfg.languages.subtitles)
+                        log(f"#{t['id']} tracks: {summary}")
                     except Exception:
                         pass
+                    if missing_subs and self.cfg.languages.subtitles_required:
+                        j.update(status="needs-map", issues=[f"pack lacks wanted subtitle language(s): {', '.join(missing_subs)}"])
+                        log(f"[{j['series']}] HELD - pack lacks wanted subtitles: {', '.join(missing_subs)} (languages.subtitles_required)")
+                        try:
+                            self.tr.stop([t["id"]])
+                        except Exception:
+                            pass
+                        self.save(s)
+                        continue
+                    if missing_subs:
+                        log(f"[{j['series']}] note: pack lacks wanted subtitle language(s): {', '.join(missing_subs)}")
                     if self.import_job(j, t) is None:
                         j["status"] = "import-failed"
                     self.save(s)

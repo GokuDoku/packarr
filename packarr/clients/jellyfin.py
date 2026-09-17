@@ -31,19 +31,23 @@ class Jellyfin:
         items = r.get("Items") or []
         return items[0]["Id"] if items else None
 
-    def episodes_with_audio(self, tvdb_id: int, lang: str) -> set[tuple[int, int]] | None:
-        """{(season, episode)} whose file carries `lang` audio, or None when Jellyfin doesn't know the series."""
+    def episodes_with_audio(self, tvdb_id: int, lang: str, subtitles: list[str] | None = None) -> set[tuple[int, int]] | None:
+        """{(season, episode)} whose file carries `lang` audio AND every language in `subtitles` as a subtitle track,
+        or None when Jellyfin doesn't know the series."""
         sid = self.series_by_tvdb(tvdb_id)
         if not sid:
             return None
         want = _ALIASES.get(lang, {lang})
+        want_subs = [_ALIASES.get(x, {x}) for x in (subtitles or [])]
         r = self._get(f"/Shows/{sid}/Episodes", Fields="MediaStreams")
         out = set()
         for it in r.get("Items") or []:
             s, e = it.get("ParentIndexNumber"), it.get("IndexNumber")
             if s is None or e is None:
                 continue
-            langs = {(st.get("Language") or "und").lower() for st in it.get("MediaStreams") or [] if st.get("Type") == "Audio"}
-            if langs & want:
+            streams = it.get("MediaStreams") or []
+            langs = {(st.get("Language") or "und").lower() for st in streams if st.get("Type") == "Audio"}
+            subs = {(st.get("Language") or "und").lower() for st in streams if st.get("Type") == "Subtitle"}
+            if (lang == "und" or langs & want) and all(subs & ws for ws in want_subs):
                 out.add((int(s), int(e)))
         return out

@@ -43,7 +43,7 @@ def cmd_check(args):
     except Exception as e:
         print(f"transmission FAIL {e}")
         ok = False
-    for name, svc in (("radarr", pipe.radarr), ("jellyfin", pipe.jellyfin)):
+    for name, svc in (("radarr", pipe.radarr), ("jellyfin", pipe.jellyfin), ("bazarr", pipe.bazarr)):
         print(f"{name:12s}{'configured' if svc else 'not configured (optional)'}")
     print(f"prowlarr    {'configured' if cfg.prowlarr.enabled else 'not configured (search/auto disabled)'}")
     print(f"downloads   {cfg.paths.downloads_local} ({'exists' if os.path.isdir(cfg.paths.downloads_local) else 'MISSING'}, {pipe.free_gb():.0f} GB free)")
@@ -144,6 +144,29 @@ def cmd_approve(args):
     pipe.approve(args.job, explicit, keep=args.keep)
 
 
+def cmd_subs(args):
+    """Find episodes whose files lack a wanted subtitle language and ask Bazarr to fetch them (no re-download)."""
+    cfg, pipe = _pipe(args)
+    if not cfg.languages.subtitles:
+        raise SystemExit("set languages.subtitles (e.g. [eng, jpn]) first")
+    if not pipe.jellyfin:
+        raise SystemExit("subtitle checks need jellyfin configured (Sonarr knows nothing about subtitle tracks)")
+    series = [pipe.sonarr.series_one(args.series)] if args.series else [s for s in pipe.sonarr.series() if s.get("seriesType") == "anime"]
+    total = 0
+    for s in series:
+        missing = pipe.missing_subtitles(s["id"], s["tvdbId"])
+        if not missing:
+            continue
+        print(f"{s['title'][:50]}: {len(missing)} missing subtitle track(s)" + ("" if args.fetch else " (dry run; add --fetch)"))
+        for e, lang in missing[:8]:
+            print(f"   S{e['seasonNumber']:02d}E{e['episodeNumber']:02d} {lang}")
+        if args.fetch:
+            if not pipe.bazarr:
+                raise SystemExit("bazarr is not configured")
+            total += pipe.fill_subtitles(s["id"], s["tvdbId"])
+    print(f"-- {'requested ' + str(total) + ' from Bazarr' if args.fetch else 'dry run complete'}")
+
+
 def cmd_serve(args):
     cfg = config.load(args.config)
     setup(cfg.paths.log_file or None)
@@ -211,6 +234,11 @@ def main(argv=None):
     p.add_argument("--map-file", help="JSON {relative path: episode id}")
     p.add_argument("--keep", action="store_true", help="keep the torrent after import instead of routing leftovers")
     p.set_defaults(fn=cmd_approve)
+
+    p = sub.add_parser("subs", help="episodes whose files lack a wanted subtitle language; --fetch asks Bazarr for them")
+    p.add_argument("--series", type=int, help="one Sonarr series id (default: every anime series)")
+    p.add_argument("--fetch", action="store_true", help="actually request the subtitles from Bazarr")
+    p.set_defaults(fn=cmd_subs)
 
     p = sub.add_parser("serve", help="listen for Sonarr 'On Series Add' webhooks (auto mode)")
     p.set_defaults(fn=cmd_serve)
