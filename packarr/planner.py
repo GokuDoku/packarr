@@ -4,6 +4,8 @@ Order of authority
   1. an explicit hand map on the job                         (`packarr approve --map`)
   2. `--map` season remaps                                     (US-numbered dub packs)
   3. the anime-lists resolver on the folder / pack title       (AniList -> AniDB -> TVDB season+offset)
+     - when anime-lists' own table looks stale (a mapped season's size disagrees with TVDB's real season
+       size), XEM is asked for a second opinion before falling back to positional/by-size guessing
   4. SxxEyy in the filename, if that episode exists
   5. folder / title season tokens + episode numbers
   6. AniDB / TVDB special titles for the leftovers
@@ -193,7 +195,16 @@ class Planner:
                         # real TVDB season size, distrust the table and map positionally instead
                         stale = any(mm["start"] and mm["end"] and mm["tvdbseason"] > 0 and mm["anidbseason"] == 1
                                     and _sc.get(mm["tvdbseason"]) not in (None, mm["end"] - mm["start"] + 1) for mm in res["maps"])
-                        if stale and tv[0] != "abs" and res.get("season") == "a":
+                        xem_tv = None
+                        if stale:
+                            try:
+                                xem_tv = R.xem_tvdb(int(job["tvdb"]), n)  # a second, independent opinion before guessing
+                            except Exception as ex:
+                                log(f"xem lookup error: {ex}")
+                        if xem_tv and xem_tv in _byse:
+                            tv = xem_tv
+                            row["note"] = "xem: anime-lists/tvdb disagreed; xem confirms"
+                        elif stale and tv[0] != "abs" and res.get("season") == "a":
                             tv = ("abs", n + res["offset"])
                             row["note"] = "stale anime-lists table; positional"
                         elif stale and tv[0] != "abs" and res.get("episodes") and len([sn for sn, c in _sc.items() if sn > 0 and c == res["episodes"]]) == 1 \

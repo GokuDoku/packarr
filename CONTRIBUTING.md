@@ -10,6 +10,12 @@ ruff check packarr tests
 pytest -q
 ```
 
+`tests/bats/` covers the packaged CLI end to end (argument parsing, config validation, `packarr web` over
+loopback) - things a unit test can't see because they only exist once the pieces are wired together.
+Needs [bats-core](https://github.com/bats-core/bats-core) and `curl`; `ubuntu-latest` GitHub runners have
+both. Locally: `bats tests/bats`. Like the pytest suite, it needs no live Sonarr or download client - a
+`.invalid` hostname stands in wherever a config needs *some* Sonarr URL to load.
+
 ## The one rule for planner changes
 
 Every heuristic in `planner.py` / `parsing.py` exists because a real pack broke the previous rule. When you change one:

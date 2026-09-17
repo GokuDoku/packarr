@@ -21,8 +21,9 @@ run it on your own library — most apply to *any* pack workflow, not just this 
 - **A restart restores cancelled commands.** If you ever need to purge Sonarr's command queue, do it in the database
   with Sonarr stopped.
 - **TVDB renumbers seasons after you imported.** Symptom: an episode file named `S02E01` mapped to episode `S02E02`,
-  or a special whose "file" is a season episode. Check for it occasionally; Packarr's plan will refuse to stack a
-  second file on a shared one.
+  or a special whose "file" is a season episode. `packarr audit` finds these (compares the SxxEyy baked into the
+  filename against what Sonarr currently thinks that episode is); Packarr's plan also refuses to stack a second
+  file on a shared one going forward.
 - **Same-title cross-show imports happen.** Netflix's *Monster* (2022) once landed on top of Urasawa's *Monster*
   (2004) episodes 9–10. A 50-minute file in a 24-minute series is the tell — Packarr's runtime check catches it.
 

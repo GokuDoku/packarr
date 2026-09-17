@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "packarr"
-version = "0.3.0"
+version = "0.8.0"
 description = "Season & series packs for anime, mapped right and imported through Sonarr."
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.9"
 authors = [{ name = "GokuDoku" }]
-keywords = ["sonarr", "radarr", "prowlarr", "anime", "nyaa", "transmission", "anime-lists", "anilist", "tvdb"]
+keywords = ["sonarr", "radarr", "prowlarr", "anime", "nyaa", "transmission", "qbittorrent", "sabnzbd", "anime-lists", "anilist", "tvdb"]
 classifiers = [
   "Environment :: Console",
   "Intended Audience :: End Users/Desktop",

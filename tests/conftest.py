@@ -31,10 +31,12 @@ def items(paths: list[str], root: str = "/downloads/pack") -> list[dict]:
 
 
 class FakeResolver:
-    """resolve(title) -> the scripted result whose key is a substring of the cleaned title (first match wins)."""
+    """resolve(title) -> the scripted result whose key is a substring of the cleaned title (first match wins).
+    xem: {(tvdb_id, anidb_episode): (season, episode)} - defaults to no XEM data for anything."""
 
-    def __init__(self, table: dict[str, dict | None]):
+    def __init__(self, table: dict[str, dict | None], xem: dict[tuple[int, int], tuple[int, int]] | None = None):
         self.table = table
+        self.xem = xem or {}
         self.calls: list[str] = []
 
     def resolve(self, title, expect_tvdb=None):
@@ -53,6 +55,9 @@ class FakeResolver:
 
     def match_special(self, res, filename, series_title=""):
         return None
+
+    def xem_tvdb(self, tvdb_id, anidb_episode):
+        return self.xem.get((tvdb_id, anidb_episode))
 
 
 def entry(tvdb: int, season, offset: int = 0, episodes_: int | None = None, title: str = "", maps=None) -> dict:

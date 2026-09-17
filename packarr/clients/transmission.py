@@ -54,6 +54,9 @@ class Transmission:
             args["ids"] = ids
         return self.call("torrent-get", args)["arguments"]["torrents"]
 
+    def version(self) -> str:
+        return str(self.call("session-get")["arguments"].get("version", ""))
+
     def add(self, download_dir: str, metainfo: bytes | None = None, magnet: str | None = None,
             files_unwanted: list[int] | None = None) -> dict:
         args: dict = {"download-dir": download_dir}

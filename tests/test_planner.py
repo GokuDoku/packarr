@@ -172,6 +172,61 @@ def test_foreign_folder_goes_to_the_other_sonarr_series(make_planner):
     assert by[files[1]]["seriesId"] == 1 and by[files[1]]["se"] == (1, 3)
 
 
+def test_xem_second_opinion_overrides_positional_fallback_when_stale(make_planner):
+    """Same stale InuYasha table as above, but XEM has its own opinion on episode 30 - and it wins."""
+    maps = [{"anidbseason": 1, "tvdbseason": 6, "start": 1, "end": 21, "offset": 0, "pairs": {}}]
+    res = FakeResolver({"InuYasha": entry(77086, "a", 0, 167, "InuYasha", maps)}, xem={(77086, 30): (2, 4)})
+    pl = make_planner(res)
+    eps = episodes({1: 27, 2: 27, 3: 27, 4: 27, 5: 26, 6: 33})
+    files = ["InuYasha/InuYasha - 030.mkv"]
+    plan, issues = pl.plan(job("InuYasha", 77086), items(files), eps, {})
+    assert not issues
+    row = next(r for r in plan if r["rel"] == files[0])
+    assert row["se"] == (2, 4)  # XEM's answer, not positional (2, 3)
+    assert "xem" in row["note"].lower()
+
+
+def test_xem_falls_through_to_heuristics_when_it_has_no_data_for_this_episode(make_planner):
+    """XEM has data for this show, but not for the specific episode in question - the old fallback still runs."""
+    maps = [{"anidbseason": 1, "tvdbseason": 6, "start": 1, "end": 21, "offset": 0, "pairs": {}}]
+    res = FakeResolver({"InuYasha": entry(77086, "a", 0, 167, "InuYasha", maps)}, xem={(77086, 99): (5, 1)})
+    pl = make_planner(res)
+    eps = episodes({1: 27, 2: 27, 3: 27, 4: 27, 5: 26, 6: 33})
+    files = ["InuYasha/InuYasha - 030.mkv"]
+    plan, issues = pl.plan(job("InuYasha", 77086), items(files), eps, {})
+    assert not issues
+    assert mapping(plan)[files[0]] == (2, 3)  # unchanged: positional fallback, as before XEM existed
+
+
+def test_xem_answer_ignored_if_it_names_an_episode_that_does_not_exist(make_planner):
+    """XEM points at a season/episode Sonarr doesn't have - don't trust a nonexistent target, fall through."""
+    maps = [{"anidbseason": 1, "tvdbseason": 6, "start": 1, "end": 21, "offset": 0, "pairs": {}}]
+    res = FakeResolver({"InuYasha": entry(77086, "a", 0, 167, "InuYasha", maps)}, xem={(77086, 30): (9, 99)})
+    pl = make_planner(res)
+    eps = episodes({1: 27, 2: 27, 3: 27, 4: 27, 5: 26, 6: 33})
+    files = ["InuYasha/InuYasha - 030.mkv"]
+    plan, issues = pl.plan(job("InuYasha", 77086), items(files), eps, {})
+    assert not issues
+    assert mapping(plan)[files[0]] == (2, 3)  # falls back to positional, XEM's bogus target rejected
+
+
+def test_xem_not_consulted_when_the_table_is_not_stale(make_planner):
+    """No disagreement, no XEM lookup at all - only a stale table triggers the second opinion."""
+    class TrackingResolver(FakeResolver):
+        def xem_tvdb(self, tvdb_id, anidb_episode):
+            self.xem_calls = getattr(self, "xem_calls", 0) + 1
+            return super().xem_tvdb(tvdb_id, anidb_episode)
+
+    res = TrackingResolver({"Cowboy Bebop": entry(76885, 1, 0, 26, "Cowboy Bebop")})
+    pl = make_planner(res)
+    eps = episodes({1: 26})
+    files = ["Cowboy Bebop/Cowboy Bebop - 03.mkv"]
+    plan, issues = pl.plan(job("Cowboy Bebop", 76885), items(files), eps, {})
+    assert not issues
+    assert mapping(plan)[files[0]] == (1, 3)
+    assert getattr(res, "xem_calls", 0) == 0
+
+
 def test_stale_table_with_numbered_default_season_stays_in_that_season(make_planner):
     """Hetalia: anime-lists still says episodes 27-52 are TVDB S2, but TVDB merged them into a 52-episode S1."""
     maps = [{"anidbseason": 1, "tvdbseason": 1, "start": 1, "end": 26, "offset": 0, "pairs": {}},

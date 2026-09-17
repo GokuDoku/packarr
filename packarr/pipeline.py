@@ -19,11 +19,12 @@ import subprocess
 import time
 
 from . import parsing as P
-from . import probe, torrentfile
+from . import nzbfile, probe, torrentfile
 from .clients.bazarr import Bazarr
 from .clients.jellyfin import Jellyfin
 from .clients.qbittorrent import QBittorrent
 from .clients.radarr import Radarr
+from .clients.sabnzbd import Sabnzbd
 from .clients.sonarr import Sonarr, languages
 from .clients.transmission import DOWNLOAD, DOWNLOAD_WAIT, Transmission
 from .config import Config
@@ -46,6 +47,8 @@ class Pipeline:
         self.bazarr = Bazarr(cfg.bazarr.url, cfg.bazarr.api_key) if cfg.bazarr.enabled else None
         if cfg.download_client == "qbittorrent":
             self.tr = QBittorrent(cfg.qbittorrent.url, cfg.qbittorrent.username, cfg.qbittorrent.password, cfg.qbittorrent.timeout)
+        elif cfg.download_client == "sabnzbd":
+            self.tr = Sabnzbd(cfg.sabnzbd.url, cfg.sabnzbd.api_key, cfg.sabnzbd.category, cfg.sabnzbd.timeout)
         else:
             self.tr = Transmission(cfg.transmission.url, cfg.transmission.username, cfg.transmission.password, cfg.transmission.timeout)
         self.resolver = Resolver(cfg.paths.state_dir, cfg.anidb_cache_dir)
@@ -92,10 +95,10 @@ class Pipeline:
     # ---- queueing ---------------------------------------------------------------------------------
     def add(self, row: dict, series_id: int, **opts) -> dict:
         """row: {title, guid|magnet, gb, info}. opts: all, languages, map, abs, dirs, gb."""
+        sel = opts.get("abs") or opts.get("dirs")
         series = self.sonarr.series_one(series_id)
         s = self.load()
         magnet = row.get("guid") or row.get("magnet") or ""
-        sel = opts.get("abs") or opts.get("dirs")
         for j in s["jobs"]:
             if j["magnet"] == magnet and j["status"] not in TERMINAL and (j.get("abs") or j.get("dirs")) == sel:
                 raise SystemExit("already queued")
@@ -111,8 +114,9 @@ class Pipeline:
         log(f"queued [{series['title']}] {job['gb']:.1f} GB  {job['title'][:90]}")
         return job
 
-    def adopt(self, torrent_id: int, series_id: int, **opts) -> dict:
-        """Take over a torrent that was added to the client by hand."""
+    def adopt(self, torrent_id: int | str, series_id: int, **opts) -> dict:
+        """Take over a torrent that was added to the client by hand. torrent_id is the Transmission
+        numeric id, or the qBittorrent info-hash, depending on download_client."""
         t = self.tr.torrents([torrent_id], ["id", "name", "hashString", "sizeWhenDone"])
         if not t:
             raise SystemExit(f"no torrent #{torrent_id}")
@@ -171,23 +175,32 @@ class Pipeline:
         try:
             torrents = self.tr.torrents(fields=["hashString", "percentDone", "sizeWhenDone", "haveValid", "status"])
         except Exception as e:
-            log(f"transmission unavailable: {e}")
+            log(f"{self.cfg.download_client} unavailable: {e}")
             return
         done = {t["hashString"] for t in torrents if t["percentDone"] >= 1}
         active = [j for j in s["jobs"] if j["status"] in ("downloading", "selecting") and j.get("hash") not in done]
         # clients pre-allocate every wanted file in full, so bytes not yet downloaded are already committed on disk
         committed = sum(t["sizeWhenDone"] - t["haveValid"] for t in torrents if t["status"] in (DOWNLOAD_WAIT, DOWNLOAD)) / 1e9
+        is_nzb = self.cfg.download_client == "sabnzbd"
         for j in s["jobs"]:
             if j["status"] != "queued":
                 continue
             budget = self.free_gb() - lim.min_free_gb - committed
             if len(active) >= lim.max_active or committed + j["gb"] > lim.max_active_gb or j["gb"] > budget:
                 continue
-            tf = torrentfile.fetch(j.get("info", ""), j.get("magnet", ""))
+            if is_nzb:
+                # unlike a magnet, a bare NZB URL has no "stalls at 0 peers" problem - SABnzbd fetching it
+                # server-side is normal and fine, so only pay for a local fetch when selection needs the
+                # file list; those same fetched bytes are then reused for the add itself (no second fetch).
+                raw = nzbfile.fetch(j.get("magnet", "")) if self.selective(j) else None
+                list_files = nzbfile.files
+            else:
+                raw = torrentfile.fetch(j.get("info", ""), j.get("magnet", ""))
+                list_files = torrentfile.files
             unwanted = None
-            if tf and self.selective(j):
+            if raw and self.selective(j):
                 try:
-                    files = torrentfile.files(tf)
+                    files = list_files(raw)
                     want = [i for i, name, _ in files if self.wanted_file(j, name)]
                     unwanted = [i for i, _, _ in files if i not in want]
                     wb = sum(ln for i, _, ln in files if i in want)
@@ -197,10 +210,10 @@ class Pipeline:
                         continue
                 except Exception as e:
                     log(f"pre-selection failed for {j['title'][:40]}: {e}")
-            elif self.selective(j) and not tf:
-                continue  # never add a selective pull as a bare magnet: it would allocate the whole pack
+            elif self.selective(j) and not raw:
+                continue  # never add a selective pull without a file list: it would allocate/download the whole pack
             try:
-                t = self.tr.add(self.cfg.paths.downloads_client, metainfo=tf, magnet=None if tf else j["magnet"], files_unwanted=unwanted)
+                t = self.tr.add(self.cfg.paths.downloads_client, metainfo=raw, magnet=None if raw else j["magnet"], files_unwanted=unwanted)
             except Exception as e:
                 log(f"add failed for {j['title'][:40]}: {e}")
                 continue
@@ -379,7 +392,7 @@ class Pipeline:
             try:
                 torrents = self.tr.torrents()
             except Exception as e:
-                log(f"transmission unavailable: {e}")
+                log(f"{self.cfg.download_client} unavailable: {e}")
                 return
             byhash = {t["hashString"]: t for t in torrents}
             parked = [t["id"] for t in torrents if t["status"] == DOWNLOAD and t["percentDone"] < 1 and t.get("trackerStats")
@@ -455,6 +468,8 @@ class Pipeline:
     # ---- held plans ------------------------------------------------------------------------------------
     def approve(self, index: int, explicit: dict[str, int] | None = None, keep: bool = False) -> dict:
         s = self.load()
+        if not 0 <= index < len(s["jobs"]):
+            raise SystemExit(f"no job #{index} (have {len(s['jobs'])}, 0-{len(s['jobs']) - 1 if s['jobs'] else 0})")
         j = s["jobs"][index]
         if j["status"] not in ("needs-map", "leftovers"):
             raise SystemExit(f"job {index} is {j['status']}, not held")
@@ -471,3 +486,31 @@ class Pipeline:
         self.save(s)
         log(f"released [{j['series']}] {j['title'][:60]}")
         return j
+
+    # ---- audit -----------------------------------------------------------------------------------
+    def audit(self, series_id: int | None = None) -> list[dict]:
+        """Files whose name still carries the SxxEyy Sonarr gave them at import time, but no longer
+        matches what Sonarr thinks that episode is now - the signature of a TVDB renumber (a season
+        re-cut, a merge) landing after the file was already imported and named. Sonarr does not go
+        back and rename files just because the numbering moved under them; nothing else in Packarr's
+        own pipeline touches already-imported files either, so these accumulate silently otherwise.
+
+        Each mismatch: {seriesId, series, episodeId, rel, fileSE, sonarrSE} - fileSE/sonarrSE are
+        (season, episode) tuples, the same shape a plan row's "se" uses.
+        """
+        all_series = [self.sonarr.series_one(series_id)] if series_id else self.sonarr.series()
+        mismatches: list[dict] = []
+        for s in all_series:
+            for e in self.sonarr.episodes(s["id"]):
+                ef = e.get("episodeFile")
+                if not e.get("hasFile") or not ef or not ef.get("relativePath"):
+                    continue
+                m = P.SE.search(os.path.basename(ef["relativePath"]))
+                if not m:
+                    continue  # filename doesn't carry SxxEyy at all (custom naming, specials) - nothing to compare
+                file_se = (int(m.group(1)), int(m.group(2)))
+                sonarr_se = (e["seasonNumber"], e["episodeNumber"])
+                if file_se != sonarr_se:
+                    mismatches.append({"seriesId": s["id"], "series": s["title"], "episodeId": e["id"],
+                                        "rel": ef["relativePath"], "fileSE": file_se, "sonarrSE": sonarr_se})
+        return mismatches

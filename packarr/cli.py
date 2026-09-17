@@ -40,7 +40,7 @@ def cmd_check(args):
     try:
         n = len(pipe.tr.torrents(fields=["id"]))
         ver = f" {pipe.tr.version()}" if hasattr(pipe.tr, "version") else ""
-        print(f"{cfg.download_client:12s}ok{ver}  ({n} torrents)")
+        print(f"{cfg.download_client:12s}ok{ver}  ({n} active)")
     except Exception as e:
         print(f"{cfg.download_client:12s}FAIL {e}")
         ok = False
@@ -92,10 +92,11 @@ def cmd_add(args):
 
 def cmd_adopt(args):
     cfg, pipe = _pipe(args)
+    torrent = int(args.torrent) if args.torrent.isdigit() else args.torrent  # Transmission: numeric id; qBittorrent: hash
     opts = {"all": args.all}
     if args.langs:
         opts["languages"] = args.langs.split(",")
-    pipe.adopt(args.torrent, args.series, **opts)
+    pipe.adopt(torrent, args.series, **opts)
 
 
 def cmd_run(args):
@@ -120,9 +121,32 @@ def cmd_status(args):
             print(f"{i:3d} {j['status']:12s} {j['gb']:7.1f} GB {str(j.get('imported', '')):>4} {j['series'][:28]:28s} {j['title'][:70]}")
 
 
+def cmd_audit(args):
+    """Find files whose SxxEyy no longer matches what Sonarr thinks that episode is now - a TVDB renumber
+    that landed after the file was imported and named. Nothing gets touched; this only reports."""
+    cfg, pipe = _pipe(args)
+    rows = pipe.audit(args.series)
+    if not rows:
+        print("-- no mismatches" + (f" for series {args.series}" if args.series else " across all series"))
+        return
+    by_series: dict[int, list[dict]] = {}
+    for r in rows:
+        by_series.setdefault(r["seriesId"], []).append(r)
+    for rs in by_series.values():
+        print(f"{rs[0]['series'][:50]}:")
+        for r in rs:
+            fs, fe = r["fileSE"]
+            ss, se = r["sonarrSE"]
+            print(f"   file says S{fs:02d}E{fe:02d}, Sonarr now says S{ss:02d}E{se:02d}   {r['rel'][-70:]}")
+    print(f"-- {len(rows)} mismatch(es) across {len(by_series)} series - rename in Sonarr (or manually) to fix")
+    sys.exit(1)
+
+
 def cmd_plan(args):
     cfg, pipe = _pipe(args)
     s = pipe.load()
+    if not 0 <= args.job < len(s["jobs"]):
+        raise SystemExit(f"no job #{args.job} (have {len(s['jobs'])}, 0-{len(s['jobs']) - 1 if s['jobs'] else 0})")
     j = s["jobs"][args.job]
     plan, issues, pf = pipe.plan_folder(j, args.folder or pipe.tr.torrents([j["trId"]], ["name"])[0]["name"])
     for r in plan:
@@ -175,6 +199,13 @@ def cmd_serve(args):
     serve(cfg)
 
 
+def cmd_web(args):
+    cfg = config.load(args.config)
+    setup(cfg.paths.log_file or None)
+    from .webui import serve
+    serve(cfg)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="packarr", description=__doc__)
     ap.add_argument("--config", "-c", help="path to packarr.yml")
@@ -210,7 +241,7 @@ def main(argv=None):
     p.set_defaults(fn=cmd_add)
 
     p = sub.add_parser("adopt", help="take over a torrent that was added to the client by hand")
-    p.add_argument("torrent", type=int, help="torrent id in the client")
+    p.add_argument("torrent", help="torrent id in Transmission, or info-hash in qBittorrent")
     p.add_argument("--series", type=int, required=True)
     p.add_argument("--all", action="store_true")
     p.add_argument("--langs")
@@ -223,6 +254,10 @@ def main(argv=None):
     p = sub.add_parser("status", help="list jobs")
     p.add_argument("--all", action="store_true", help="include finished jobs")
     p.set_defaults(fn=cmd_status)
+
+    p = sub.add_parser("audit", help="find files whose SxxEyy no longer matches Sonarr's current numbering (TVDB renumbered under you)")
+    p.add_argument("--series", type=int, help="just this Sonarr series id (default: every series)")
+    p.set_defaults(fn=cmd_audit)
 
     p = sub.add_parser("plan", help="(re)plan a job's folder and print the proposal without importing")
     p.add_argument("job", type=int)
@@ -245,8 +280,16 @@ def main(argv=None):
     p = sub.add_parser("serve", help="listen for Sonarr 'On Series Add' webhooks (auto mode)")
     p.set_defaults(fn=cmd_serve)
 
+    p = sub.add_parser("web", help="browser UI for approving/hand-mapping held jobs (see config: web.listen)")
+    p.set_defaults(fn=cmd_web)
+
     args = ap.parse_args(argv)
-    args.fn(args)
+    try:
+        args.fn(args)
+    except (SystemExit, KeyboardInterrupt):
+        raise  # already a deliberate, clean exit (or the user asked to stop) - don't wrap it
+    except Exception as e:
+        raise SystemExit(f"{args.fn.__name__.removeprefix('cmd_')}: {e}")
 
 
 if __name__ == "__main__":
